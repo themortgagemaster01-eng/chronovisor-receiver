@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#050805">
+<link rel="manifest" href="manifest.json">
+<title>CHRONO VISOR — Aether Receiver</title>
+<style>
+  :root { --ph:#00ffcc; --dim:#00997a; --amber:#ffb000; --alert:#ff3b3b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:#050805; color:var(--ph); font-family:'Courier New',monospace;
+         overflow:hidden; height:100vh; height:100dvh;
+         padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  #visor { height:100%; display:flex; flex-direction:column; }
+  #header { text-align:center; padding:4px; border-bottom:1px solid var(--dim); text-shadow:0 0 8px var(--ph); }
+  #header h1 { margin:0; font-size:clamp(12px,3.5vw,18px); letter-spacing:3px; }
+  #header p { margin:0; font-size:9px; color:var(--dim); letter-spacing:1px; }
+  #controls { display:flex; flex-wrap:wrap; gap:5px; padding:5px 8px;
+              background:rgba(0,20,10,0.6); border-bottom:1px solid var(--dim); }
+  input,button,select { background:#0a120c; color:var(--ph); border:1px solid var(--dim);
+                 padding:9px; font-family:inherit; font-size:13px; border-radius:0; }
+  input:focus,button:focus-visible,select:focus { outline:2px solid var(--ph); }
+  #prompt { flex:1 1 140px; min-width:110px; }
+  #date { flex:0 1 auto; color-scheme:dark; max-width:140px; }
+  button { cursor:pointer; letter-spacing:1px; }
+  button:hover:not(:disabled),button:active:not(:disabled) { background:var(--ph); color:#000; }
+  button:disabled { opacity:0.4; }
+  .mini { font-size:10px; padding:6px 7px; }
+  #sliders { display:flex; gap:10px; flex-wrap:wrap; padding:4px 8px; font-size:10px;
+             background:rgba(0,15,8,0.7); border-bottom:1px solid var(--dim); align-items:center; }
+  .sl { display:flex; align-items:center; gap:5px; flex:1 1 180px; }
+  .sl label { color:var(--dim); white-space:nowrap; }
+  .sl input[type=range] { flex:1; accent-color:#00ffcc; padding:0; height:20px; }
+  .sl .val { color:var(--amber); min-width:44px; text-align:right; }
+  #sensorrow { display:flex; gap:5px; flex-wrap:wrap; padding:4px 8px; font-size:10px;
+               background:rgba(0,15,8,0.7); border-bottom:1px solid var(--dim); }
+  .chip { border:1px solid var(--dim); padding:3px 7px; color:var(--dim); white-space:nowrap; }
+  .chip.on { color:var(--ph); border-color:var(--ph); text-shadow:0 0 5px var(--ph); }
+  .chip.hot { color:var(--amber); border-color:var(--amber); }
+  #display { flex:1; position:relative; overflow:hidden; margin:6px;
+             border:2px solid var(--dim); border-radius:14px; background:#000; min-height:130px; }
+  canvas#staticcv { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+  #footage { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1;
+             display:none; filter:sepia(0.28) contrast(1.08) saturate(0.75) brightness(0.95); }
+  #stillwrap { position:absolute; inset:0; overflow:hidden; z-index:1; display:none; }
+  #still { width:100%; height:100%; object-fit:cover;
+           filter:sepia(0.3) contrast(1.1) saturate(0.7);
+           animation:drift 24s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform:scale(1) translate(0,0); } to { transform:scale(1.1) translate(-2%,1.5%); } }
+  #status { position:absolute; top:6px; left:10px; font-size:10px; letter-spacing:2px; z-index:4;
+            color:var(--amber); text-shadow:0 0 6px var(--amber); pointer-events:none; }
+  #conf { position:absolute; top:6px; right:10px; font-size:10px; letter-spacing:2px; z-index:4; pointer-events:none; }
+  #stamp { position:absolute; bottom:34px; right:10px; font-size:10px; z-index:4;
+           color:rgba(255,240,200,0.8); letter-spacing:2px; pointer-events:none;
+           text-shadow:0 0 4px rgba(255,200,100,0.5); }
+  #spectrum { position:absolute; bottom:0; left:0; width:100%; height:30px; z-index:4; background:rgba(0,0,0,0.45); }
+  #graincv { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
+  .crt { position:absolute; inset:0; pointer-events:none; z-index:3; border-radius:12px;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%),
+    repeating-linear-gradient(transparent 0px, transparent 2px, rgba(0,255,150,0.03) 3px, transparent 4px); }
+  #output { max-height:20vh; overflow-y:auto; padding:6px 10px; font-size:12px; line-height:1.4;
+            background:rgba(0,25,12,0.75); border-top:1px solid var(--dim); white-space:pre-wrap; }
+  #output .sys { color:var(--dim); font-size:10px; }
+  #output .err { color:var(--alert); }
+  #output .promptbox { border:1px dashed var(--amber); color:#ffe0a0; padding:6px; margin:4px 0; font-size:11px; }
+  .arc { border:1px solid var(--dim); padding:5px 8px; margin:3px 0; cursor:pointer; font-size:11px; }
+  .arc:hover,.arc:active { border-color:var(--ph); color:var(--ph); }
+  .cursor { display:inline-block; width:7px; height:12px; background:var(--ph);
+            vertical-align:text-bottom; animation:blink .8s step-end infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #keymodal { position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:10; display:none;
+              align-items:center; justify-content:center; padding:20px; }
+  #keymodal .box { background:#0a120c; border:1px solid var(--ph); padding:16px; max-width:420px; width:100%; }
+  #keymodal input { width:100%; margin:6px 0; }
+  #keymodal p,#keymodal label { font-size:11px; color:var(--dim); line-height:1.5; }
+  @media (prefers-reduced-motion: reduce) { .cursor { animation:none; } #still { animation:none; } }
+</style>
+</head>
+<body>
+<div id="visor">
+  <div id="header">
+    <h1>CHRONO VISOR — AETHER RECEIVER</h1>
+    <p>v0.6 · SENSOR-TUNED CARRIER · PHOTOREAL SIGNAL DECODE</p>
+  </div>
+  <div id="controls">
+    <input type="text" id="prompt" placeholder="Event / address / place…" />
+    <input type="date" id="date" />
+    <select id="perspective">
+      <option value="documentary eye-level shot">OBSERVER</option>
+      <option value="first-person point of view">PARTICIPANT</option>
+      <option value="high aerial establishing shot">AERIAL</option>
+      <option value="intimate close-up shot">CLOSE-UP</option>
+    </select>
+    <select id="engine">
+      <option value="video">SIGNAL: VIDEO</option>
+      <option value="still">SIGNAL: STILL</option>
+      <option value="prompt">SIGNAL: PROMPT→GROK</option>
+    </select>
+    <button id="tuneBtn" onclick="viewPast()">⏻ RECEIVE</button>
+    <button class="mini" onclick="initSensors()">SENSORS</button>
+    <button class="mini" onclick="useGPS()">⌖ GPS</button>
+    <button class="mini" onclick="showArchive()">ARCHIVE</button>
+    <button class="mini" onclick="showKeyModal()">KEYS</button>
+  </div>
+  <div id="sliders">
+    <div class="sl">
+      <label>TIMELINE</label>
+      <input type="range" id="year" min="-1000" max="2026" value="1900" step="1">
+      <span class="val" id="yearval">1900</span>
+    </div>
+  </div>
+  <div id="sensorrow">
+    <span class="chip" id="c-mic">MIC —</span>
+    <span class="chip" id="c-infra">INFRA 0.0</span>
+    <span class="chip" id="c-mag">FIELD —</span>
+    <span class="chip" id="c-motion">MOTION —</span>
+    <span class="chip" id="c-gps">GPS —</span>
+    <span class="chip" id="c-sig">SIG 0%</span>
+  </div>
+  <div id="display">
+    <canvas id="staticcv"></canvas>
+    <video id="footage" autoplay loop muted playsinline></video>
+    <div id="stillwrap"><img id="still" alt=""></div>
+    <canvas id="graincv"></canvas>
+    <div id="status">STANDBY</div>
+    <div id="conf"></div>
+    <div id="stamp"></div>
+    <canvas id="spectrum"></canvas>
+    <div class="crt"></div>
+  </div>
+  <div id="output"><span class="sys">&gt; Receiver idle. Arm SENSORS, set target + TIMELINE, then RECEIVE. KEYS to attach carriers (Anthropic = tuner, FAL = decoder).</span></div>
+</div>
+
+<div id="keymodal">
+  <div class="box">
+    <b>CARRIER KEYS</b>
+    <p>Stored only on this device.</p>
+    <label>ANTHROPIC (tuner — writes the signal from target + sensors)</label>
+    <input type="password" id="antkey" placeholder="sk-ant-…" />
+    <label>FAL.AI (decoder — renders real video/stills · fal.ai → dashboard → API keys)</label>
+    <input type="password" id="falkey" placeholder="fal key id:secret" />
+    <label>FAL VIDEO MODEL (advanced — default LTX)</label>
+    <input type="text" id="falvideomodel" placeholder="fal-ai/ltx-video" />
+    <label>FAL IMAGE MODEL (advanced — default FLUX schnell)</label>
+    <input type="text" id="falimagemodel" placeholder="fal-ai/flux/schnell" />
+    <button onclick="saveKeys()">SAVE</button>
+    <button onclick="clearKeys()">CLEAR ALL</button>
+    <button onclick="hideKeyModal()">CLOSE</button>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+const $ = id => document.getElementById(id);
+const canvas = $('staticcv'), ctx = canvas.getContext('2d');
+const grain = $('graincv'), gctx = grain.getContext('2d');
+const spectrumEl = $('spectrum'), sctx = spectrumEl.getContext('2d');
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let mode = 'static', lockLevel = 0;
+let micAnalyser = null, micData = null;
+let fieldReading = 0, motionReading = 0, infraLevel = 0, gpsCoords = null;
+let lastTargetBase = null;
+
+function sizeCanvas() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  [canvas, grain].forEach(c => { c.width = r.width * dpr | 0; c.height = r.height * dpr | 0; });
+  spectrumEl.width = r.width * dpr | 0; spectrumEl.height = 30 * dpr;
+}
+addEventListener('resize', sizeCanvas); sizeCanvas();
+
+$('year').addEventListener('input', () => {
+  const y = parseInt($('year').value);
+  $('yearval').textContent = y < 0 ? Math.abs(y) + ' BC' : y;
+});
+$('year').addEventListener('change', () => {
+  if (lastTargetBase && !$('tuneBtn').disabled) {
+    sysLine('Timeline scrubbed → re-receiving at ' + $('yearval').textContent + '…');
+    viewPast(true);
+  }
+});
+
+// ============ SENSORS ============
+async function initSensors() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    ac.createMediaStreamSource(stream).connect(micAnalyser = ac.createAnalyser());
+    micAnalyser.fftSize = 2048; micAnalyser.smoothingTimeConstant = 0.7;
+    micData = new Uint8Array(micAnalyser.frequencyBinCount);
+    $('c-mic').textContent = 'MIC LIVE'; $('c-mic').classList.add('on');
+    sysLine('Microphone armed — low-band residue monitor live.');
+  } catch (e) { sysLine('Mic access denied.', 'err'); }
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
+      if (await DeviceMotionEvent.requestPermission() !== 'granted') throw 0;
+    }
+    addEventListener('devicemotion', e => {
+      const a = e.accelerationIncludingGravity;
+      if (a) motionReading = Math.abs(Math.hypot(a.x||0, a.y||0, a.z||0) - 9.81);
+    });
+    addEventListener('deviceorientation', e => {
+      const h = e.webkitCompassHeading ?? e.alpha;
+      if (h != null) fieldReading = h;
+    });
+    $('c-motion').textContent = 'MOTION LIVE'; $('c-motion').classList.add('on');
+    $('c-mag').classList.add('on');
+    sysLine('Motion + field sensors armed.');
+  } catch (e) { sysLine('Motion sensors unavailable or denied.', 'err'); }
+}
+
+function useGPS() {
+  navigator.geolocation.getCurrentPosition(pos => {
+    gpsCoords = { lat: pos.coords.latitude.toFixed(5), lon: pos.coords.longitude.toFixed(5) };
+    $('c-gps').textContent = `GPS ${gpsCoords.lat},${gpsCoords.lon}`; $('c-gps').classList.add('on');
+    sysLine(`Position locked: ${gpsCoords.lat}, ${gpsCoords.lon}`);
+    if (!$('prompt').value) $('prompt').value = 'this exact location';
+  }, () => sysLine('GPS denied.', 'err'), { enableHighAccuracy: true });
+}
+
+function pollSensors() {
+  if (micAnalyser) {
+    micAnalyser.getByteFrequencyData(micData);
+    let low = 0; for (let i = 1; i < 9; i++) low += micData[i];
+    infraLevel = low / 8 / 255;
+    $('c-infra').textContent = 'INFRA ' + (infraLevel * 10).toFixed(1);
+    $('c-infra').className = 'chip ' + (infraLevel > 0.55 ? 'hot' : infraLevel > 0.2 ? 'on' : '');
+    const w = spectrumEl.width, h = spectrumEl.height;
+    sctx.fillStyle = 'rgba(0,5,2,0.9)'; sctx.fillRect(0, 0, w, h);
+    const bins = 96, bw = w / bins;
+    for (let i = 0; i < bins; i++) {
+      const v = micData[i] / 255;
+      sctx.fillStyle = i < 9 ? `rgba(255,176,0,${0.4 + v * 0.6})` : `rgba(0,255,204,${0.25 + v * 0.6})`;
+      sctx.fillRect(i * bw, h - v * h, bw - 1, v * h);
+    }
+  }
+  $('c-mag').textContent = 'FIELD ' + fieldReading.toFixed(0) + '°';
+  if (motionReading > 0.01) $('c-motion').textContent = 'MOTION ' + motionReading.toFixed(2);
+  const sig = Math.min(1, infraLevel * 0.9 + Math.min(motionReading / 4, 0.3) + (gpsCoords ? 0.15 : 0));
+  $('c-sig').textContent = 'SIG ' + (sig * 100 | 0) + '%';
+  $('c-sig').className = 'chip ' + (sig > 0.6 ? 'hot' : sig > 0.25 ? 'on' : '');
+  requestAnimationFrame(pollSensors);
+}
+requestAnimationFrame(pollSensors);
+
+// ============ STATIC + FILM GRAIN RENDER ============
+function loop(t) {
+  const w = canvas.width, h = canvas.height;
+  if (mode === 'footage') {
+    // Static canvas hidden behind media; render grain overlay only
+    ctx.clearRect(0, 0, w, h);
+    gctx.clearRect(0, 0, grain.width, grain.height);
+    if (!reducedMotion) {
+      for (let i = 0; i < 150; i++) {
+        gctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.08)';
+        gctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+      }
+      if (Math.random() < 0.04) { gctx.fillStyle = 'rgba(255,255,240,0.08)'; gctx.fillRect(Math.random() * w, 0, 1.5, h); }
+      gctx.fillStyle = `rgba(255,240,210,${0.01 + 0.015 * Math.abs(Math.sin(t * 0.013))})`;
+      gctx.fillRect(0, 0, w, h);
+    }
+  } else {
+    gctx.clearRect(0, 0, grain.width, grain.height);
+    ctx.fillStyle = '#000600'; ctx.fillRect(0, 0, w, h);
+    const density = (mode === 'tuning' ? 1500 - lockLevel * 1200 : 700) + infraLevel * 900;
+    for (let i = 0; i < density; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,255,190,0.45)' : 'rgba(120,255,220,0.15)';
+      ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+    }
+    if (Math.random() < 0.1 + infraLevel * 0.3) {
+      ctx.fillStyle = 'rgba(0,255,204,0.09)';
+      ctx.fillRect(0, Math.random() * h, w, 5 + Math.random() * 24);
+    }
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function showMedia(kind, url) {
+  $('footage').style.display = kind === 'video' ? 'block' : 'none';
+  $('stillwrap').style.display = kind === 'still' ? 'block' : 'none';
+  if (kind === 'video') { $('footage').src = url; $('footage').play().catch(() => {}); }
+  if (kind === 'still') $('still').src = url;
+  if (!kind) { $('footage').removeAttribute('src'); $('still').removeAttribute('src'); }
+  mode = kind ? 'footage' : 'static';
+}
+
+// ============ OUTPUT ============
+const output = $('output');
+function sysLine(text, cls = 'sys') {
+  const p = document.createElement('div'); p.className = cls; p.textContent = '> ' + text;
+  output.appendChild(p); output.scrollTop = output.scrollHeight;
+}
+async function typewriter(text) {
+  const p = document.createElement('div'), cur = document.createElement('span');
+  cur.className = 'cursor'; output.appendChild(p); p.appendChild(cur);
+  const step = reducedMotion ? 9999 : 3;
+  for (let i = 0; i < text.length; i += step) {
+    p.textContent = text.slice(0, i + step); p.appendChild(cur);
+    output.scrollTop = output.scrollHeight;
+    if (!reducedMotion) await new Promise(r => setTimeout(r, 16));
+  }
+  cur.remove();
+}
+async function tuningSequence(fast) {
+  mode = 'tuning'; lockLevel = 0; showMedia(null);
+  const phases = fast ? ['Re-phasing carrier…', 'Timeline shift lock…']
+    : ['Charging chronon capacitors…', 'TRIANGULATING AETHER FREQUENCY…',
+       'Sampling infrasound residue…', 'Handing signal to decoder…'];
+  const t0 = performance.now(), dur = fast ? 1400 : 3000; let pi = -1;
+  await new Promise(res => { (function tick() {
+    const t = Math.min((performance.now() - t0) / dur, 1); lockLevel = t;
+    const i = Math.min(t * phases.length | 0, phases.length - 1);
+    $('status').textContent = phases[i];
+    if (i !== pi) { pi = i; sysLine(phases[i]); }
+    t < 1 ? setTimeout(tick, 90) : res();
+  })(); });
+}
+
+// ============ KEYS ============
+function showKeyModal() {
+  $('keymodal').style.display = 'flex';
+  $('antkey').value = localStorage.getItem('cv_key') || '';
+  $('falkey').value = localStorage.getItem('cv_fal') || '';
+  $('falvideomodel').value = localStorage.getItem('cv_fal_vm') || '';
+  $('falimagemodel').value = localStorage.getItem('cv_fal_im') || '';
+}
+function hideKeyModal() { $('keymodal').style.display = 'none'; }
+function saveKeys() {
+  localStorage.setItem('cv_key', $('antkey').value.trim());
+  localStorage.setItem('cv_fal', $('falkey').value.trim());
+  localStorage.setItem('cv_fal_vm', $('falvideomodel').value.trim());
+  localStorage.setItem('cv_fal_im', $('falimagemodel').value.trim());
+  hideKeyModal(); sysLine('Carrier keys stored on device.');
+}
+function clearKeys() {
+  ['cv_key','cv_fal','cv_fal_vm','cv_fal_im'].forEach(k => localStorage.removeItem(k));
+  hideKeyModal(); sysLine('All keys cleared.');
+}
+
+// ============ ARCHIVE ============
+function saveToArchive(target, rec) {
+  let arc = JSON.parse(localStorage.getItem('cv_archive_v6') || '[]');
+  arc.unshift({ ts: new Date().toISOString(), target, rec });
+  if (arc.length > 20) arc.pop();
+  localStorage.setItem('cv_archive_v6', JSON.stringify(arc));
+}
+function showArchive() {
+  const arc = JSON.parse(localStorage.getItem('cv_archive_v6') || '[]');
+  output.innerHTML = '';
+  if (!arc.length) { sysLine('Archive empty.'); return; }
+  sysLine('ARCHIVE — tap to replay (media links may expire after some days):');
+  arc.forEach((a, i) => {
+    const d = document.createElement('div'); d.className = 'arc';
+    d.textContent = `[${String(i + 1).padStart(2, '0')}] ${a.target.slice(0, 48)} · ${a.ts.slice(0, 10)}`;
+    d.onclick = () => replayArchive(a);
+    output.appendChild(d);
+  });
+  output.scrollTop = 0;
+}
+function replayArchive(a) {
+  output.innerHTML = '';
+  $('status').textContent = '◉ ARCHIVE — ' + a.target.toUpperCase().slice(0, 30);
+  $('stamp').textContent = a.rec.stamp || ''; setConf(a.rec.confidence);
+  if (a.rec.mediaKind && a.rec.mediaUrl) showMedia(a.rec.mediaKind, a.rec.mediaUrl);
+  sysLine('Archive playback: ' + a.target);
+  if (a.rec.video_prompt) showPromptBox(a.rec.video_prompt);
+  typewriter(a.rec.narration || '');
+}
+function setConf(c) {
+  const el = $('conf');
+  if (!c) { el.textContent = ''; return; }
+  el.textContent = 'CONF ' + c.toUpperCase();
+  el.style.color = c === 'high' ? '#00ffcc' : c === 'medium' ? '#ffb000' : '#ff3b3b';
+  el.style.textShadow = '0 0 6px ' + el.style.color;
+}
+function showPromptBox(promptText) {
+  const box = document.createElement('div'); box.className = 'promptbox';
+  box.textContent = promptText;
+  const btn = document.createElement('button'); btn.className = 'mini'; btn.textContent = 'COPY FOR GROK IMAGINE';
+  btn.onclick = () => { navigator.clipboard.writeText(promptText).then(() => sysLine('Signal copied — paste into Grok Imagine.')); };
+  output.appendChild(box); output.appendChild(btn);
+  output.scrollTop = output.scrollHeight;
+}
+
+// ============ FAL DECODER ============
+async function falQueue(model, input, falKey, label) {
+  const submit = await fetch('https://queue.fal.run/' + model, {
+    method: 'POST',
+    headers: { 'Authorization': 'Key ' + falKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input)
+  });
+  if (!submit.ok) throw new Error('Decoder rejected signal (' + submit.status + ')');
+  const job = await submit.json();
+  const statusUrl = job.status_url, responseUrl = job.response_url;
+  const t0 = Date.now();
+  while (true) {
+    await new Promise(r => setTimeout(r, 2500));
+    const s = await (await fetch(statusUrl, { headers: { 'Authorization': 'Key ' + falKey } })).json();
+    $('status').textContent = label + ' — ' + (s.status || '…') + ' ' + ((Date.now() - t0) / 1000 | 0) + 's';
+    if (s.status === 'COMPLETED') break;
+    if (s.status === 'FAILED' || Date.now() - t0 > 240000) throw new Error('Decode failed or timed out');
+  }
+  return await (await fetch(responseUrl, { headers: { 'Authorization': 'Key ' + falKey } })).json();
+}
+
+// ============ MAIN ============
+async function viewPast(isScrub = false) {
+  const promptVal = $('prompt').value.trim();
+  const dateVal = $('date').value;
+  const yearLbl = $('yearval').textContent;
+  const persp = $('perspective').value;
+  const engine = $('engine').value;
+  if (!promptVal) { sysLine('No target specified.', 'err'); return; }
+  $('tuneBtn').disabled = true;
+  if (!isScrub) output.innerHTML = '';
+  $('stamp').textContent = ''; setConf(null);
+
+  lastTargetBase = promptVal;
+  let target = promptVal + ' — era/year: ' + yearLbl;
+  if (dateVal) target += ' — exact date: ' + dateVal;
+  if (gpsCoords) target += ` — coordinates: ${gpsCoords.lat}, ${gpsCoords.lon}`;
+  const sensorCtx = `Instrument telemetry — infrasound residue ${(infraLevel * 10).toFixed(1)}/10, bearing ${fieldReading.toFixed(0)}°, vibration ${motionReading.toFixed(2)} m/s².`;
+
+  const antKey = localStorage.getItem('cv_key');
+  const falKey = localStorage.getItem('cv_fal');
+  const tuning = tuningSequence(isScrub);
+
+  // -------- Stage 1: TUNER (Claude writes the signal) --------
+  let rec = null;
+  if (antKey) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': antKey,
+          'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5', max_tokens: 900,
+          messages: [{ role: 'user', content:
+`You are the tuner stage of a fictional temporal viewing device. Target: "${target}". ${sensorCtx} Camera style: ${persp}.
+Respond ONLY with valid JSON, no fences. Use real historical/geographic knowledge of this place/event in that era. Schema:
+{"video_prompt":"a single cinematic text-to-video prompt, 60-100 words: photorealistic recovered archival footage of the target as it truly appeared in that era — era-accurate architecture, clothing, vehicles, light, weather; ${persp}; slight film degradation, documentary realism; NO text, NO watermark, NO modern elements",
+"stamp":"timestamp/location overlay, max 40 chars",
+"confidence":"high"|"medium"|"low (honest rating of how documented this place+era is)",
+"narration":"90-130 word present-tense eyewitness reconstruction, in-character as recovered footage narration, weaving in the telemetry"}` }]
+        })
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error.message);
+      const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      rec = JSON.parse(text.replace(/```json|```/g, '').trim());
+    } catch (e) { sysLine('Tuner offline (' + String(e.message).slice(0, 50) + ') — using local signal template.', 'err'); }
+  }
+  if (!rec) rec = {
+    video_prompt: `Photorealistic recovered archival footage: ${promptVal}, year ${yearLbl}. Era-accurate architecture, clothing, vehicles and light. ${persp}. Documentary realism, natural weather and atmosphere, slight film grain and degradation. No text, no watermark, no modern elements.`,
+    stamp: (promptVal + ' · ' + yearLbl).toUpperCase().slice(0, 38),
+    confidence: antKey ? 'medium' : 'low',
+    narration: `[LOCAL TEMPLATE] Signal composed for ${promptVal}, ${yearLbl}. ${sensorCtx}`
+  };
+
+  await tuning;
+
+  // -------- Stage 2: DECODER --------
+  try {
+    if (engine === 'prompt' || !falKey) {
+      if (engine !== 'prompt') sysLine('No FAL decoder key — handing signal to Grok Imagine instead.');
+      mode = 'static';
+      $('status').textContent = '◉ SIGNAL COMPOSED — DECODE EXTERNALLY';
+      setConf(rec.confidence);
+      sysLine('Tuned signal ready:');
+      showPromptBox(rec.video_prompt);
+      rec.mediaKind = null;
+    } else if (engine === 'still') {
+      $('status').textContent = 'DECODING STILL…';
+      const model = localStorage.getItem('cv_fal_im') || 'fal-ai/flux/schnell';
+      const res = await falQueue(model, { prompt: rec.video_prompt, image_size: 'landscape_16_9' }, falKey, 'DECODING STILL');
+      const url = res.images?.[0]?.url || res.image?.url;
+      if (!url) throw new Error('No image in decode');
+      showMedia('still', url);
+      rec.mediaKind = 'still'; rec.mediaUrl = url;
+      $('status').textContent = '◉ SIGNAL LOCKED — ' + promptVal.toUpperCase().slice(0, 24) + ' · ' + yearLbl;
+    } else {
+      $('status').textContent = 'DECODING VIDEO…';
+      const model = localStorage.getItem('cv_fal_vm') || 'fal-ai/ltx-video';
+      const res = await falQueue(model, { prompt: rec.video_prompt }, falKey, 'DECODING VIDEO');
+      const url = res.video?.url || res.videos?.[0]?.url;
+      if (!url) throw new Error('No video in decode');
+      showMedia('video', url);
+      rec.mediaKind = 'video'; rec.mediaUrl = url;
+      $('status').textContent = '◉ TRANSMISSION — ' + promptVal.toUpperCase().slice(0, 24) + ' · ' + yearLbl;
+    }
+    $('stamp').textContent = rec.stamp || '';
+    setConf(rec.confidence);
+    saveToArchive(promptVal + ' · ' + yearLbl, rec);
+    await typewriter(rec.narration || '');
+    if (rec.mediaKind) sysLine('Scrub TIMELINE to shift eras. Footage archived.');
+  } catch (e) {
+    mode = 'static';
+    $('status').textContent = '⚠ DECODE FAILED';
+    sysLine('Decoder error: ' + String(e.message).slice(0, 80), 'err');
+    sysLine('Signal preserved — decode it externally:');
+    showPromptBox(rec.video_prompt);
+  } finally { $('tuneBtn').disabled = false; }
+}
+
+$('prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('tuneBtn').disabled) viewPast(); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
