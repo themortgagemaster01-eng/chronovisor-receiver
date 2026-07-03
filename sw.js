@@ -11,3 +11,4 @@ self.addEventListener('fetch', e => {
   if (e.request.url.includes('queue.fal.run') || e.request.url.includes('fal.media')) return; // never cache decoder
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
+// build 2026-07-03T19:05:35.083Z — reception v5
