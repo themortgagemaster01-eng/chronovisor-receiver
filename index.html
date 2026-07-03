@@ -619,7 +619,10 @@ $('year').addEventListener('change', () => {
 
 // ============ SENSORS ============
 async function initSensors() {
-  try {
+  dbg('ARM SENSORS tapped — requesting microphone + motion/field access…');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    sysLine('getUserMedia unavailable (needs HTTPS + a supporting browser).', 'err');
+  } else try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     const ac = getAC();
@@ -630,11 +633,19 @@ async function initSensors() {
     $('c-mic').textContent = 'MIC LIVE'; $('c-mic').classList.add('on');
     document.body.classList.add('mic-live');
     logEvent('mic', { state:'armed' });
+    dbg('getUserMedia(audio): GRANTED · AudioContext ' + ac.state, 'ok');
     sysLine('Microphone armed — spectrogram + waveform + EVP monitor live.');
-  } catch (e) { sysLine('Mic access denied — page still works, visuals only.', 'err'); }
+  } catch (e) {
+    dbg('getUserMedia(audio) FAILED: ' + (e && e.name || '') + ' — ' + (e && e.message || e), 'err');
+    sysLine('Mic access denied — page still works, visuals only.', 'err');
+  }
   try {
     if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
-      if (await DeviceMotionEvent.requestPermission() !== 'granted') throw 0;
+      const perm = await DeviceMotionEvent.requestPermission();
+      dbg('DeviceMotionEvent.requestPermission → ' + perm, perm === 'granted' ? 'ok' : 'err');
+      if (perm !== 'granted') throw new Error('motion permission ' + perm);
+    } else {
+      dbg('DeviceMotion permission API absent — attaching listeners directly.');
     }
     addEventListener('devicemotion', e => {
       const a = e.accelerationIncludingGravity;
@@ -646,19 +657,26 @@ async function initSensors() {
     });
     $('c-motion').textContent = 'MOTION LIVE'; $('c-motion').classList.add('on');
     $('c-mag').classList.add('on');
+    dbg('Motion + orientation (magnetometer/compass) listeners active.', 'ok');
     sysLine('Motion + field sensors armed.');
-  } catch (e) { sysLine('Motion sensors unavailable or denied.', 'err'); }
+  } catch (e) {
+    dbg('Motion/field sensors FAILED: ' + (e && e.message || e), 'err');
+    sysLine('Motion sensors unavailable or denied.', 'err');
+  }
 }
 
 function useGPS() {
   if (!navigator.geolocation) { sysLine('GPS unsupported on this device.', 'err'); return; }
+  dbg('Geolocation.getCurrentPosition requested…');
   navigator.geolocation.getCurrentPosition(pos => {
     gpsCoords = { lat: pos.coords.latitude.toFixed(5), lon: pos.coords.longitude.toFixed(5) };
     $('c-gps').textContent = `GPS ${gpsCoords.lat},${gpsCoords.lon}`; $('c-gps').classList.add('on');
+    dbg('Geolocation: GRANTED · ' + gpsCoords.lat + ',' + gpsCoords.lon, 'ok');
     sysLine(`Position locked: ${gpsCoords.lat}, ${gpsCoords.lon}`);
     logEvent('gps', gpsCoords);
     if (!$('prompt').value) $('prompt').value = 'this exact location';
-  }, () => sysLine('GPS denied.', 'err'), { enableHighAccuracy: true });
+  }, err => { dbg('Geolocation FAILED: ' + (err && err.message || err), 'err'); sysLine('GPS denied.', 'err'); },
+     { enableHighAccuracy: true });
 }
 
 // ---- live level-spike ("hit") detection ----
@@ -862,11 +880,13 @@ async function toggleCamera(){
     camCv.style.display = 'block';
     $('btnCam').classList.add('on'); $('ax-cam').checked = true;
     prevGray = null;
+    dbg('getUserMedia(video, facing=' + facing + '): GRANTED', 'ok');
     sysLine('Live camera coupled — visual echo processing on-device.');
     logEvent('camera', { state:'on', facing });
     renderCam();
   } catch (e) {
     $('ax-cam').checked = false;
+    dbg('getUserMedia(video) FAILED: ' + (e && e.name || '') + ' — ' + (e && e.message || e), 'err');
     sysLine('Camera access denied — cosmic field retained.', 'err');
   }
 }
@@ -1087,11 +1107,72 @@ async function evpReview(){
   }
 }
 
+// ============ DEBUG CONSOLE (permissions + errors, so nothing fails silently) ============
+const DBG = { lines: [], body: null, pending: [] };
+function dbgEnsure() {
+  if (DBG.body || !document.body || !document.head) return;
+  const style = document.createElement('style');
+  style.textContent =
+    '#dbgToggle{position:fixed;right:10px;bottom:10px;z-index:99998;font:11px ui-monospace,Menlo,monospace;' +
+    'background:rgba(10,14,26,.82);color:#e9c06a;border:1px solid rgba(233,192,106,.4);border-radius:9px;' +
+    'padding:6px 10px;backdrop-filter:blur(8px);cursor:pointer;letter-spacing:.04em}' +
+    '#dbgPanel{position:fixed;left:8px;right:8px;bottom:48px;max-height:44vh;z-index:99999;display:none;' +
+    'flex-direction:column;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;background:rgba(8,11,20,.94);' +
+    'border:1px solid rgba(233,192,106,.35);border-radius:13px;box-shadow:0 10px 44px rgba(0,0,0,.65);' +
+    'backdrop-filter:blur(12px);overflow:hidden}' +
+    '#dbgPanel.open{display:flex}' +
+    '#dbgHead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 11px;' +
+    'color:#e9c06a;border-bottom:1px solid rgba(233,192,106,.2);background:rgba(233,192,106,.06);letter-spacing:.04em}' +
+    '#dbgHead button{font:11px ui-monospace,monospace;background:transparent;color:#e9c06a;' +
+    'border:1px solid rgba(233,192,106,.35);border-radius:6px;padding:2px 8px;margin-left:6px;cursor:pointer}' +
+    '#dbgBody{overflow:auto;padding:8px 11px;line-height:1.55}' +
+    '#dbgBody div{white-space:pre-wrap;word-break:break-word}' +
+    '#dbgBody .ok{color:#79f2b0}#dbgBody .err{color:#ff8a8a}#dbgBody .warn{color:#ffd479}#dbgBody .sys{color:#9fb4d8}';
+  document.head.appendChild(style);
+  const tog = document.createElement('button'); tog.id = 'dbgToggle'; tog.type = 'button'; tog.textContent = '⚙ DEBUG';
+  const panel = document.createElement('div'); panel.id = 'dbgPanel';
+  panel.innerHTML =
+    '<div id="dbgHead"><span>⚙ RECEIVER DEBUG · permissions &amp; errors</span>' +
+    '<span><button id="dbgCopy" type="button">COPY</button>' +
+    '<button id="dbgClear" type="button">CLEAR</button>' +
+    '<button id="dbgHide" type="button">✕</button></span></div><div id="dbgBody"></div>';
+  document.body.appendChild(tog); document.body.appendChild(panel);
+  DBG.body = panel.querySelector('#dbgBody');
+  tog.onclick = () => panel.classList.toggle('open');
+  panel.querySelector('#dbgHide').onclick = () => panel.classList.remove('open');
+  panel.querySelector('#dbgClear').onclick = () => { DBG.lines.length = 0; DBG.body.innerHTML = ''; };
+  panel.querySelector('#dbgCopy').onclick = () => { try { navigator.clipboard.writeText(DBG.lines.join('\n')); } catch (_) {} };
+  const q = DBG.pending; DBG.pending = null; q.forEach(a => dbgRender(a[0], a[1]));
+}
+function dbgRender(msg, level) {
+  const d = document.createElement('div'); d.className = level || 'sys';
+  d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  DBG.body.appendChild(d); DBG.body.scrollTop = DBG.body.scrollHeight;
+}
+function dbg(msg, level = 'sys') {
+  DBG.lines.push(msg);
+  if (document.body && document.head) { dbgEnsure(); dbgRender(msg, level); }
+  else if (DBG.pending) { DBG.pending.push([msg, level]);
+    document.addEventListener('DOMContentLoaded', dbgEnsure, { once: true }); }
+}
+// surface anything that would otherwise fail silently
+addEventListener('error', e => dbg('JS error: ' + (e.message || (e.error && e.error.message) || 'unknown'), 'err'));
+addEventListener('unhandledrejection', e => dbg('Promise rejection: ' + ((e.reason && e.reason.message) || e.reason || 'unknown'), 'err'));
+(function () {
+  const oe = console.error, ow = console.warn;
+  console.error = function () { try { dbg(Array.from(arguments).join(' '), 'err'); } catch (_) {} return oe.apply(console, arguments); };
+  console.warn = function () { try { dbg(Array.from(arguments).join(' '), 'warn'); } catch (_) {} return ow.apply(console, arguments); };
+})();
+dbg('ChronoVisor receiver online · ' + (navigator.userAgent || '').slice(0, 60), 'ok');
+dbg('secureContext=' + !!self.isSecureContext + ' · getUserMedia=' + !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) +
+    ' · DeviceMotion=' + (typeof DeviceMotionEvent !== 'undefined') + ' · geolocation=' + !!navigator.geolocation);
+
 // ============ OUTPUT ============
 const output = $('output');
 function sysLine(text, cls = 'sys') {
   const p = document.createElement('div'); p.className = cls; p.textContent = '> ' + text;
   output.appendChild(p); output.scrollTop = output.scrollHeight;
+  try { if (cls === 'err') dbg(text, 'err'); } catch (_) {}
 }
 async function typewriter(text) {
   const p = document.createElement('div'), cur = document.createElement('span');
@@ -1392,7 +1473,28 @@ Respond ONLY with valid JSON, no fences. Use real historical/geographic knowledg
 }
 
 $('prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('tuneBtn').disabled) viewPast(); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// ============ SERVICE WORKER — self-updating (no manual cache clear) ============
+if ('serviceWorker' in navigator) {
+  let reloadingForSW = false;
+  // When a new SW takes control (skipWaiting + clients.claim), reload once so the fresh build applies.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForSW) return;
+    reloadingForSW = true;
+    dbg('New receiver build activated \u2014 reloading to apply.', 'ok');
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    dbg('Service worker registered \u00b7 scope ' + (reg.scope || '(root)'), 'ok');
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (nw) nw.addEventListener('statechange', () => dbg('SW state \u2192 ' + nw.state));
+    });
+    reg.update().catch(() => {}); // proactively check for a newer build on every load
+  }).catch(err => dbg('SW registration failed: ' + (err && err.message || err), 'err'));
+} else {
+  dbg('Service workers unsupported in this browser.', 'warn');
+}
 </script>
 </body>
 </html>
