@@ -72,12 +72,15 @@
   .chip.hot{ color:#f2d79a; text-shadow:0 0 10px rgba(232,196,122,.9); }
   .meter{ display:flex; align-items:flex-end; gap:2px; height:34px; padding-top:1px; }
   .meter span{ width:3px; background:linear-gradient(180deg,var(--gold-b),var(--gold-d));
-    box-shadow:0 0 4px rgba(201,169,97,.5); opacity:.85; animation:mflick 2.6s ease-in-out infinite; }
+    box-shadow:0 0 4px rgba(201,169,97,.5); opacity:.85; transform-origin:bottom;
+    animation:mflick 2.6s ease-in-out infinite; }
+  body.mic-live .meter span{ animation:none; transition:transform .08s linear; }
   @keyframes mflick{ 0%,100%{ transform:scaleY(.55); opacity:.55; } 50%{ transform:scaleY(1); opacity:1; } }
   .hud-center{ display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:1px; }
   .reticle{ width:34px; height:34px; opacity:.85; }
   .wordmark{ font-family:var(--serif); font-size:11px; letter-spacing:.42em; color:var(--gold);
     padding-left:.42em; opacity:.85; }
+  .subnote{ font-size:7.5px; letter-spacing:.16em; color:var(--dim); opacity:.85; text-align:center; }
   .hud-right{ display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
   #tuneBtn{ font-family:var(--sans); font-size:12px; letter-spacing:.22em; color:#241a05;
     background:linear-gradient(180deg,#f4e2b4,var(--gold) 55%,#a9884d);
@@ -112,6 +115,23 @@
     cursor:pointer; transition:.2s; }
   .pill-sm:hover,.pill-sm:active{ background:rgba(201,169,97,.12); box-shadow:0 0 14px rgba(201,169,97,.25); }
 
+  /* ===== AETHER quick control bar ===== */
+  .aebar{ display:flex; gap:6px; align-items:stretch; }
+  .ae-tog{ flex:1; background:rgba(10,14,28,.55); border:1px solid var(--line-s);
+    border-radius:20px; padding:7px 4px; font-size:9.5px; letter-spacing:.12em; color:var(--dim);
+    cursor:pointer; transition:.2s; white-space:nowrap; text-align:center;
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .ae-tog:hover:not(:disabled){ border-color:var(--line); color:var(--gold); }
+  .ae-tog.on{ color:#241a05; border-color:var(--gold-b);
+    background:linear-gradient(180deg,#f4e2b4,var(--gold) 60%,#a9884d);
+    box-shadow:0 0 14px rgba(201,169,97,.4); }
+  .ae-tog.rec{ color:#ffdad2; border-color:var(--alert);
+    background:rgba(224,106,90,.18); box-shadow:0 0 14px rgba(224,106,90,.4);
+    animation:recpulse 1.1s ease-in-out infinite; }
+  @keyframes recpulse{ 50%{ box-shadow:0 0 22px rgba(224,106,90,.7); } }
+  .ae-tog:disabled{ opacity:.4; cursor:default; }
+  .ae-more{ flex:0 0 auto; }
+
   .viewport-wrap{ flex:1 1 auto; min-height:0; display:flex; }
   #display{ position:relative; flex:1; min-height:170px; overflow:hidden; isolation:isolate;
     border-radius:26px; background:#04050c;
@@ -119,7 +139,7 @@
     box-shadow:0 0 0 3px rgba(6,9,18,.9), 0 0 0 4px rgba(201,169,97,.28),
       0 0 34px rgba(201,169,97,.22), inset 0 0 40px rgba(0,0,0,.6); }
   #display::before{ content:''; position:absolute; top:9px; left:50%; transform:translateX(-50%);
-    width:74px; height:6px; border-radius:6px; background:#01020a; z-index:6;
+    width:74px; height:6px; border-radius:6px; background:#01020a; z-index:8;
     box-shadow:inset 0 0 0 1px rgba(201,169,97,.25); }
   #nebula{ position:absolute; inset:0; z-index:0; border-radius:inherit; overflow:hidden;
     background:
@@ -139,24 +159,37 @@
       radial-gradient(1px 1px at 72% 74%, rgba(255,240,210,.8), transparent),
       radial-gradient(1px 1px at 22% 58%, rgba(210,224,255,.7), transparent); }
   @keyframes swirl{ to{ transform:rotate(360deg); } }
+  body.cam-on #nebula{ opacity:.16; }
   canvas#staticcv{ position:absolute; inset:0; width:100%; height:100%; z-index:1;
     mix-blend-mode:screen; opacity:.6; }
-  #footage{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1;
+  #cam{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;
+    opacity:0; pointer-events:none; }
+  canvas#camproc{ position:absolute; inset:0; width:100%; height:100%; z-index:1; display:none; }
+  #footage{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:2;
     display:none; filter:sepia(.28) contrast(1.08) saturate(.75) brightness(.95); }
-  #stillwrap{ position:absolute; inset:0; overflow:hidden; z-index:1; display:none; }
+  #stillwrap{ position:absolute; inset:0; overflow:hidden; z-index:2; display:none; }
   #still{ width:100%; height:100%; object-fit:cover;
     filter:sepia(.3) contrast(1.1) saturate(.7);
     animation:drift 24s ease-in-out infinite alternate; }
   @keyframes drift{ from{ transform:scale(1) translate(0,0); } to{ transform:scale(1.1) translate(-2%,1.5%); } }
-  #status{ position:absolute; top:20px; left:14px; font-size:9.5px; letter-spacing:.2em; z-index:4;
+  #status{ position:absolute; top:20px; left:14px; font-size:9.5px; letter-spacing:.2em; z-index:6;
     color:var(--gold-b); text-shadow:0 0 8px rgba(201,169,97,.7); pointer-events:none; max-width:70%; }
-  #conf{ position:absolute; top:20px; right:14px; font-size:9.5px; letter-spacing:.2em; z-index:4; pointer-events:none; }
-  #stamp{ position:absolute; bottom:38px; right:14px; font-size:9.5px; z-index:4;
+  #conf{ position:absolute; top:20px; right:14px; font-size:9.5px; letter-spacing:.2em; z-index:6; pointer-events:none; }
+  #stamp{ position:absolute; bottom:56px; right:14px; font-size:9.5px; z-index:6;
     color:rgba(255,240,210,.82); letter-spacing:.2em; pointer-events:none;
     text-shadow:0 0 5px rgba(232,196,122,.6); }
-  #spectrum{ position:absolute; bottom:0; left:0; width:100%; height:30px; z-index:4; background:rgba(2,3,10,.5); }
-  #graincv{ position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
-  .crt{ position:absolute; inset:0; pointer-events:none; z-index:3; border-radius:inherit;
+  #expnote{ position:absolute; bottom:56px; left:14px; font-size:7.5px; letter-spacing:.18em; z-index:6;
+    color:rgba(201,169,97,.55); pointer-events:none; }
+  #waveform{ position:absolute; bottom:26px; left:0; width:100%; height:22px; z-index:5;
+    background:rgba(2,3,10,.35); }
+  #waterfall{ position:absolute; bottom:0; left:0; width:100%; height:26px; z-index:5;
+    background:rgba(2,3,10,.6); }
+  #hitflash{ position:absolute; inset:0; z-index:7; pointer-events:none; opacity:0;
+    background:radial-gradient(ellipse at center, rgba(232,209,155,.28), transparent 62%);
+    transition:opacity .12s ease-out; }
+  #hitflash.show{ opacity:1; }
+  #graincv{ position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; }
+  .crt{ position:absolute; inset:0; pointer-events:none; z-index:4; border-radius:inherit;
     background:
       radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.6) 100%),
       repeating-linear-gradient(transparent 0 2px, rgba(201,169,97,.03) 3px, transparent 4px); }
@@ -169,6 +202,7 @@
     font-family:'SF Mono',ui-monospace,'Courier New',monospace; letter-spacing:.02em; color:var(--gold-b); }
   #output .sys{ color:var(--dim); font-size:10px; }
   #output .err{ color:var(--alert); }
+  #output .hit{ color:#f2d79a; text-shadow:0 0 8px rgba(232,196,122,.7); }
   #output .promptbox{ border:1px dashed var(--amber); color:#ffe6bd; padding:7px; margin:5px 0; font-size:10.5px; border-radius:6px; }
   .arc{ border:1px solid var(--line-s); padding:6px 8px; margin:3px 0; cursor:pointer; font-size:10.5px; border-radius:6px; transition:.2s; }
   .arc:hover,.arc:active{ border-color:var(--gold); color:var(--gold-b); }
@@ -201,9 +235,10 @@
     background:var(--gold); box-shadow:0 0 10px rgba(201,169,97,.8); cursor:pointer; }
   .tuning .val{ font-size:10px; color:var(--amber); min-width:38px; text-align:right; letter-spacing:.06em; }
 
-  #keymodal{ position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
+  /* ===== modals (keys + aether) ===== */
+  .modal{ position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
     padding:22px; background:rgba(3,5,12,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); }
-  #keymodal .box{ position:relative; width:100%; max-width:420px; max-height:90dvh; overflow-y:auto;
+  .modal .box{ position:relative; width:100%; max-width:420px; max-height:90dvh; overflow-y:auto;
     padding:26px 22px 20px; border-radius:16px;
     background:linear-gradient(160deg, rgba(22,28,52,.72), rgba(10,14,30,.78));
     backdrop-filter:blur(16px) saturate(1.15); -webkit-backdrop-filter:blur(16px) saturate(1.15);
@@ -215,7 +250,7 @@
   .mtop::before{ content:'✦'; }
   .mclose{ position:absolute; top:14px; right:14px; width:28px; height:28px; border-radius:50%;
     background:transparent; border:1px solid var(--line); color:var(--gold); font-size:13px; cursor:pointer;
-    line-height:1; transition:.2s; }
+    line-height:1; transition:.2s; z-index:2; }
   .mclose:hover{ background:rgba(201,169,97,.15); }
   .mtitle{ margin:2px 0 16px; text-align:center; font-family:var(--serif); font-weight:600;
     font-size:22px; letter-spacing:.24em; color:var(--gold-b); text-shadow:0 0 18px rgba(201,169,97,.4); }
@@ -225,10 +260,10 @@
   .klabel::before{ content:''; width:7px; height:7px; border-radius:50%;
     background:radial-gradient(circle,#f6e6bd,var(--gold)); box-shadow:0 0 8px rgba(201,169,97,.8); }
   .kdesc{ font-size:11px; line-height:1.6; color:#9a8f72; margin:0 0 9px; letter-spacing:.02em; font-family:var(--sans); }
-  #keymodal input{ width:100%; background:rgba(4,6,14,.6); border:1px solid var(--line-s);
+  .modal input[type=password],.modal input[type=text]{ width:100%; background:rgba(4,6,14,.6); border:1px solid var(--line-s);
     border-radius:9px; padding:11px 12px; color:var(--gold-b); font-size:12px; letter-spacing:.05em; margin-top:2px; }
-  #keymodal input::placeholder{ color:#6b6144; }
-  #keymodal input:focus{ outline:none; border-color:var(--gold); box-shadow:0 0 12px rgba(201,169,97,.3); }
+  .modal input::placeholder{ color:#6b6144; }
+  .modal input:focus{ outline:none; border-color:var(--gold); box-shadow:0 0 12px rgba(201,169,97,.3); }
   .tuner{ position:relative; height:40px; margin:2px 0 10px; border:1px solid var(--line);
     border-radius:22px; background:rgba(4,6,14,.5); overflow:hidden; }
   .tuner::before{ content:''; position:absolute; top:50%; left:6%; right:6%; height:2px; transform:translateY(-50%);
@@ -248,7 +283,7 @@
   .tog{ display:flex; align-items:center; gap:10px; font-size:12px; letter-spacing:.18em; color:#e7ddc4; cursor:pointer; }
   .tog input{ position:absolute; opacity:0; width:0; height:0; }
   .tog i{ position:relative; width:44px; height:24px; border-radius:18px; background:rgba(8,11,22,.85);
-    border:1px solid var(--line); transition:.25s; }
+    border:1px solid var(--line); transition:.25s; flex:0 0 auto; }
   .tog i::after{ content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
     background:radial-gradient(circle at 35% 30%,#f6e6bd,var(--gold) 60%,#8f7742); transition:.25s;
     box-shadow:0 0 8px rgba(201,169,97,.6); }
@@ -265,9 +300,31 @@
   .btn-solid:hover{ box-shadow:0 0 30px rgba(232,209,155,.75); }
   .kondev{ text-align:center; font-size:9.5px; letter-spacing:.14em; color:var(--dim); margin:14px 0 2px; }
 
-  @media (max-width:360px){ .wordmark{ display:none; } .util-row{ gap:5px; } }
+  /* aether modal specific */
+  .aerow{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:11px 2px; }
+  .aerow label.lbl{ font-size:11px; letter-spacing:.14em; color:#cdbf9c; flex:0 0 auto; }
+  .aerow select,.aerow input[type=range]{ flex:1 1 auto; min-width:0; }
+  .aerow select{ -webkit-appearance:none; appearance:none; background:rgba(4,6,14,.6);
+    border:1px solid var(--line-s); border-radius:8px; padding:8px 24px 8px 10px; color:var(--gold-b);
+    font-size:11px; letter-spacing:.08em;
+    background-image:linear-gradient(45deg,transparent 50%,var(--gold) 50%),linear-gradient(135deg,var(--gold) 50%,transparent 50%);
+    background-position:calc(100% - 13px) 50%,calc(100% - 8px) 50%; background-size:5px 5px,5px 5px; background-repeat:no-repeat; }
+  .aerow input[type=range]{ -webkit-appearance:none; appearance:none; height:3px; border-radius:3px;
+    background:linear-gradient(90deg,var(--gold),var(--gold-d)); }
+  .aerow input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#f6e6bd,var(--gold) 60%,#8f7742); box-shadow:0 0 8px rgba(201,169,97,.7); }
+  .aerow input[type=range]::-moz-range-thumb{ width:14px; height:14px; border:0; border-radius:50%; background:var(--gold); }
+  .aerow .rv{ flex:0 0 auto; font-size:10px; color:var(--amber); min-width:52px; text-align:right; }
+  .aebtns{ display:flex; gap:8px; margin-top:8px; }
+  .aebtns button{ flex:1; background:rgba(6,9,18,.5); border:1px solid var(--line); border-radius:9px;
+    padding:10px 4px; font-size:10px; letter-spacing:.12em; color:var(--gold-b); cursor:pointer; transition:.2s; }
+  .aebtns button:hover:not(:disabled){ background:rgba(201,169,97,.12); box-shadow:0 0 12px rgba(201,169,97,.25); }
+  .aebtns button:disabled{ opacity:.4; cursor:default; }
+  .logstat{ font-size:10px; color:var(--dim); letter-spacing:.1em; margin:8px 2px 2px; text-align:center; }
+
+  @media (max-width:360px){ .wordmark{ display:none; } .subnote{ display:none; } .util-row{ gap:5px; } .aebar{ gap:4px; } .ae-tog{ font-size:8.5px; } }
   @media (prefers-reduced-motion: reduce){
-    .cursor,.meter span,#nebula::before{ animation:none; } #still{ animation:none; }
+    .cursor,.meter span,#nebula::before{ animation:none; } #still{ animation:none; } .ae-tog.rec{ animation:none; }
   }
 </style>
 </head>
@@ -307,6 +364,7 @@
         <path d="M8 14l-4 0 0 4M32 14l4 0 0 4M8 26l-4 0 0-4M32 26l4 0 0-4" opacity=".7"/>
       </svg>
       <div class="wordmark">CHRONOVISOR</div>
+      <div class="subnote">experimental · exploration only</div>
     </div>
     <div class="hud-right">
       <button id="tuneBtn" onclick="viewPast()">RECEIVE</button>
@@ -337,9 +395,19 @@
     </div>
   </section>
 
+  <div class="aebar">
+    <button class="ae-tog" id="btnTones" onclick="toggleTones()">♫ TONES</button>
+    <button class="ae-tog" id="btnCam" onclick="toggleCamera()">◉ CAMERA</button>
+    <button class="ae-tog" id="btnEvp" onclick="toggleEvpRecord()">● EVP</button>
+    <button class="ae-tog" id="btnRev" onclick="evpReview()" disabled>▷ REVIEW</button>
+    <button class="pill-sm ae-more" onclick="showAether()">◊ AETHER</button>
+  </div>
+
   <div class="viewport-wrap">
     <div id="display">
       <div id="nebula"></div>
+      <video id="cam" autoplay muted playsinline></video>
+      <canvas id="camproc"></canvas>
       <canvas id="staticcv"></canvas>
       <video id="footage" autoplay loop muted playsinline></video>
       <div id="stillwrap"><img id="still" alt=""></div>
@@ -347,12 +415,15 @@
       <div id="status">STANDBY</div>
       <div id="conf"></div>
       <div id="stamp"></div>
-      <canvas id="spectrum"></canvas>
+      <div id="expnote">EXPERIMENTAL · EXPLORATION ONLY</div>
+      <canvas id="waveform"></canvas>
+      <canvas id="waterfall"></canvas>
+      <div id="hitflash"></div>
       <div class="crt"></div>
     </div>
   </div>
 
-  <div id="output"><span class="sys">&gt; Receiver idle. Arm SENSORS, set target + TIMELINE, then RECEIVE. KEYS to attach carriers (Anthropic = tuner, FAL = decoder).</span></div>
+  <div id="output"><span class="sys">&gt; Receiver idle. Arm SENSORS, set target + TIMELINE, then RECEIVE. TONES / CAMERA / EVP tap to bring signal in. KEYS to attach carriers (Anthropic = tuner, FAL = decoder).</span></div>
 
   <footer class="dock">
     <button class="pill" onclick="initSensors()">ARM SENSORS</button>
@@ -368,7 +439,7 @@
   </footer>
 </div>
 
-<div id="keymodal">
+<div id="keymodal" class="modal">
   <div class="box">
     <div class="deco"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
     <div class="mtop"></div>
@@ -405,29 +476,139 @@
   </div>
 </div>
 
+<div id="aethermodal" class="modal">
+  <div class="box">
+    <div class="deco"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
+    <div class="mtop"></div>
+    <button class="mclose" onclick="hideAether()" aria-label="Close">✕</button>
+    <h2 class="mtitle">AETHER TUNING</h2>
+
+    <div class="mdiv">TUNING TONES</div>
+    <div class="aerow">
+      <label class="tog"><span>TONE ENGINE</span><input type="checkbox" id="ax-tone" onchange="toggleTones()"><i></i></label>
+    </div>
+    <div class="aerow">
+      <label class="tog"><span>Schumann 7.83 Hz base</span><input type="checkbox" id="ax-schu" checked onchange="onToneCtl()"><i></i></label>
+    </div>
+    <div class="aerow">
+      <label class="lbl">Solfeggio</label>
+      <select id="ax-solf" onchange="onToneCtl()">
+        <option value="396">396 · release</option>
+        <option value="417">417 · change</option>
+        <option value="432">432 · natural pitch</option>
+        <option value="528" selected>528 · love / DNA</option>
+        <option value="639">639 · connection</option>
+        <option value="741">741 · awakening</option>
+        <option value="852">852 · intuition</option>
+        <option value="963">963 · pineal</option>
+      </select>
+    </div>
+    <div class="aerow">
+      <label class="tog"><span>Binaural beat</span><input type="checkbox" id="ax-bin" onchange="onToneCtl()"><i></i></label>
+    </div>
+    <div class="aerow">
+      <label class="tog"><span>Isochronic pulse</span><input type="checkbox" id="ax-iso" onchange="onToneCtl()"><i></i></label>
+    </div>
+    <div class="aerow">
+      <label class="lbl">Beat / pulse</label>
+      <input type="range" id="ax-beat" min="1" max="30" step="0.01" value="7.83" oninput="onToneCtl()">
+      <span class="rv" id="ax-beatv">7.83 Hz</span>
+    </div>
+    <div class="aerow">
+      <label class="lbl">Volume</label>
+      <input type="range" id="ax-vol" min="0" max="0.4" step="0.005" value="0.14" oninput="onToneCtl()">
+      <span class="rv" id="ax-volv">14%</span>
+    </div>
+    <div class="aerow">
+      <label class="tog"><span>Mute</span><input type="checkbox" id="ax-mute" onchange="onToneCtl()"><i></i></label>
+    </div>
+    <p class="kdesc">The TUNING dial in the dock gently sweeps the carrier while tones play — scrub the timeline to hear the receiver couple.</p>
+
+    <div class="mdiv">VISUAL ECHO · LIVE CAMERA</div>
+    <div class="aerow">
+      <label class="tog"><span>LIVE CAMERA</span><input type="checkbox" id="ax-cam" onchange="toggleCamera()"><i></i></label>
+    </div>
+    <div class="aerow">
+      <label class="lbl">Facing</label>
+      <select id="ax-face" onchange="restartCameraIfOn()">
+        <option value="environment" selected>Rear</option>
+        <option value="user">Front</option>
+      </select>
+    </div>
+    <div class="aerow">
+      <label class="lbl">Echo intensity</label>
+      <input type="range" id="ax-echo" min="0" max="1" step="0.01" value="0.55" oninput="onEchoCtl()">
+      <span class="rv" id="ax-echov">55%</span>
+    </div>
+    <div class="aerow">
+      <label class="tog"><span>Edge / anomaly overlay</span><input type="checkbox" id="ax-edge" checked onchange="onEchoCtl()"><i></i></label>
+    </div>
+
+    <div class="mdiv">EVP REVIEW</div>
+    <div class="aerow">
+      <label class="lbl">Playback speed</label>
+      <input type="range" id="ax-evsp" min="0.5" max="0.75" step="0.01" value="0.65" oninput="document.getElementById('ax-evspv').textContent=Math.round(this.value*100)+'%'">
+      <span class="rv" id="ax-evspv">65%</span>
+    </div>
+    <div class="aerow">
+      <label class="lbl">Gate sensitivity</label>
+      <input type="range" id="ax-gate" min="1" max="4" step="0.05" value="2.2" oninput="document.getElementById('ax-gatev').textContent=(+this.value).toFixed(2)+'×'">
+      <span class="rv" id="ax-gatev">2.20×</span>
+    </div>
+    <div class="aebtns">
+      <button id="ax-rec" onclick="toggleEvpRecord()">● RECORD</button>
+      <button id="ax-rev" onclick="evpReview()" disabled>▷ REVIEW</button>
+    </div>
+
+    <div class="mdiv">SESSION LOG</div>
+    <div class="logstat" id="ax-logstat">0 events logged</div>
+    <div class="aebtns">
+      <button onclick="exportLog('json')">⬇ JSON</button>
+      <button onclick="exportLog('txt')">⬇ TEXT</button>
+      <button onclick="clearLog()">CLEAR</button>
+    </div>
+
+    <p class="kondev">Phone-native PAC-V instrument · all processing on-device · not a real observation of the past.</p>
+  </div>
+</div>
+
 <script>
 // ============ STATE ============
 const $ = id => document.getElementById(id);
 const canvas = $('staticcv'), ctx = canvas.getContext('2d');
 const grain = $('graincv'), gctx = grain.getContext('2d');
-const spectrumEl = $('spectrum'), sctx = spectrumEl.getContext('2d');
+const waveEl = $('waveform'), wvctx = waveEl.getContext('2d');
+const wfEl = $('waterfall'), wfctx = wfEl.getContext('2d');
+const camEl = $('cam'), camCv = $('camproc'), cctx = camCv.getContext('2d', { willReadFrequently:false });
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 let mode = 'static', lockLevel = 0;
-let micAnalyser = null, micData = null;
+let micAnalyser = null, micData = null, micTime = null, micStream = null;
 let fieldReading = 0, motionReading = 0, infraLevel = 0, gpsCoords = null;
 let lastTargetBase = null;
+const meterBars = Array.from(document.querySelectorAll('.meter span'));
+
+// shared AudioContext (created on a user gesture — iOS requires this)
+let AC = null;
+function getAC(){
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === 'suspended') AC.resume().catch(()=>{});
+  return AC;
+}
 
 function sizeCanvas() {
   const r = canvas.parentElement.getBoundingClientRect();
   const dpr = Math.min(devicePixelRatio || 1, 2);
   [canvas, grain].forEach(c => { c.width = r.width * dpr | 0; c.height = r.height * dpr | 0; });
-  spectrumEl.width = r.width * dpr | 0; spectrumEl.height = 30 * dpr;
+  waveEl.width = r.width * dpr | 0; waveEl.height = 22 * dpr | 0;
+  wfEl.width = r.width * dpr | 0; wfEl.height = 26 * dpr | 0;
+  camCv.width = r.width * dpr | 0; camCv.height = r.height * dpr | 0;
 }
 addEventListener('resize', sizeCanvas); sizeCanvas();
 
 $('year').addEventListener('input', () => {
   const y = parseInt($('year').value);
   $('yearval').textContent = y < 0 ? Math.abs(y) + ' BC' : y;
+  toneSweep();
 });
 $('year').addEventListener('change', () => {
   if (lastTargetBase && !$('tuneBtn').disabled) {
@@ -439,15 +620,18 @@ $('year').addEventListener('change', () => {
 // ============ SENSORS ============
 async function initSensors() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-    const ac = new (window.AudioContext || window.webkitAudioContext)();
-    ac.createMediaStreamSource(stream).connect(micAnalyser = ac.createAnalyser());
+    const ac = getAC();
+    ac.createMediaStreamSource(micStream).connect(micAnalyser = ac.createAnalyser());
     micAnalyser.fftSize = 2048; micAnalyser.smoothingTimeConstant = 0.7;
     micData = new Uint8Array(micAnalyser.frequencyBinCount);
+    micTime = new Uint8Array(micAnalyser.fftSize);
     $('c-mic').textContent = 'MIC LIVE'; $('c-mic').classList.add('on');
-    sysLine('Microphone armed — low-band residue monitor live.');
-  } catch (e) { sysLine('Mic access denied.', 'err'); }
+    document.body.classList.add('mic-live');
+    logEvent('mic', { state:'armed' });
+    sysLine('Microphone armed — spectrogram + waveform + EVP monitor live.');
+  } catch (e) { sysLine('Mic access denied — page still works, visuals only.', 'err'); }
   try {
     if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
       if (await DeviceMotionEvent.requestPermission() !== 'granted') throw 0;
@@ -467,29 +651,58 @@ async function initSensors() {
 }
 
 function useGPS() {
+  if (!navigator.geolocation) { sysLine('GPS unsupported on this device.', 'err'); return; }
   navigator.geolocation.getCurrentPosition(pos => {
     gpsCoords = { lat: pos.coords.latitude.toFixed(5), lon: pos.coords.longitude.toFixed(5) };
     $('c-gps').textContent = `GPS ${gpsCoords.lat},${gpsCoords.lon}`; $('c-gps').classList.add('on');
     sysLine(`Position locked: ${gpsCoords.lat}, ${gpsCoords.lon}`);
+    logEvent('gps', gpsCoords);
     if (!$('prompt').value) $('prompt').value = 'this exact location';
   }, () => sysLine('GPS denied.', 'err'), { enableHighAccuracy: true });
+}
+
+// ---- live level-spike ("hit") detection ----
+let levelAvg = 0, lastHit = 0;
+function detectHit(level) {
+  levelAvg = levelAvg * 0.96 + level * 0.04;
+  const now = performance.now();
+  if (level > levelAvg * 1.8 && level > 42 && now - lastHit > 1200) {
+    lastHit = now;
+    flashHit();
+    $('c-mic').classList.add('hot');
+    setTimeout(() => $('c-mic').classList.remove('hot'), 700);
+    const detail = `level ${level|0} vs floor ${levelAvg|0}`;
+    sysLine('▲ level spike flagged — ' + detail, 'hit');
+    logEvent('hit', { source:'live-mic', level:level|0, floor:levelAvg|0 });
+  }
+}
+let hitTimer = null;
+function flashHit() {
+  const f = $('hitflash'); f.classList.add('show');
+  clearTimeout(hitTimer); hitTimer = setTimeout(() => f.classList.remove('show'), 140);
 }
 
 function pollSensors() {
   if (micAnalyser) {
     micAnalyser.getByteFrequencyData(micData);
+    micAnalyser.getByteTimeDomainData(micTime);
     let low = 0; for (let i = 1; i < 9; i++) low += micData[i];
     infraLevel = low / 8 / 255;
     $('c-infra').textContent = 'INFRA ' + (infraLevel * 10).toFixed(1);
     $('c-infra').className = 'chip ' + (infraLevel > 0.55 ? 'hot' : infraLevel > 0.2 ? 'on' : '');
-    const w = spectrumEl.width, h = spectrumEl.height;
-    sctx.fillStyle = 'rgba(0,5,2,0.9)'; sctx.fillRect(0, 0, w, h);
-    const bins = 96, bw = w / bins;
-    for (let i = 0; i < bins; i++) {
-      const v = micData[i] / 255;
-      sctx.fillStyle = i < 9 ? `rgba(255,176,0,${0.4 + v * 0.6})` : `rgba(0,255,204,${0.25 + v * 0.6})`;
-      sctx.fillRect(i * bw, h - v * h, bw - 1, v * h);
+
+    // overall level → hit detection + HUD meter
+    let sum = 0; for (let i = 0; i < 128; i++) sum += micData[i];
+    const level = sum / 128;
+    detectHit(level);
+    for (let b = 0; b < meterBars.length; b++) {
+      const bin = 2 + b * 3;
+      const v = Math.max(0.12, micData[bin] / 255);
+      meterBars[b].style.transform = 'scaleY(' + v.toFixed(2) + ')';
+      meterBars[b].style.opacity = (0.5 + v * 0.5).toFixed(2);
     }
+    drawWaveform();
+    drawWaterfall();
   }
   $('c-mag').textContent = 'FIELD ' + fieldReading.toFixed(0) + '°';
   if (motionReading > 0.01) $('c-motion').textContent = 'MOTION ' + motionReading.toFixed(2);
@@ -500,11 +713,257 @@ function pollSensors() {
 }
 requestAnimationFrame(pollSensors);
 
+// ---- waveform (oscilloscope) ----
+function drawWaveform() {
+  const w = waveEl.width, h = waveEl.height;
+  wvctx.clearRect(0, 0, w, h);
+  wvctx.strokeStyle = 'rgba(232,209,155,0.85)';
+  wvctx.lineWidth = Math.max(1, w / 700);
+  wvctx.beginPath();
+  const n = micTime.length, step = Math.max(1, n / w | 0);
+  for (let x = 0, i = 0; i < n; i += step, x += w * step / n) {
+    const y = (micTime[i] / 255) * h;
+    i === 0 ? wvctx.moveTo(0, y) : wvctx.lineTo(x, y);
+  }
+  wvctx.stroke();
+}
+
+// ---- waterfall spectrogram (gold-on-navy, scrolling) ----
+function gold(v) {
+  // v 0..1 -> navy → gold → pale
+  if (v < 0.5) { const t = v / 0.5; return `rgb(${(8 + t * 193)|0},${(11 + t * 158)|0},${(28 + t * 20)|0})`; }
+  const t = (v - 0.5) / 0.5; return `rgb(${(201 + t * 54)|0},${(169 + t * 76)|0},${(48 + t * 172)|0})`;
+}
+function drawWaterfall() {
+  const w = wfEl.width, h = wfEl.height;
+  if (w < 2 || h < 2) return;
+  const img = wfctx.getImageData(0, 0, w, h - 1);
+  wfctx.putImageData(img, 0, 1);
+  const half = micData.length * 0.42; // emphasize lower/voice bands
+  for (let x = 0; x < w; x++) {
+    const bin = (x / w * half) | 0;
+    const v = Math.min(1, micData[bin] / 255 * 1.15);
+    wfctx.fillStyle = gold(v);
+    wfctx.fillRect(x, 0, 1, 1);
+  }
+}
+
+// ============ TUNING TONES ============
+const TONE = { on:false };
+let toneMaster=null, oscA=null, oscB=null, panA=null, panB=null,
+    isoGain=null, isoLFO=null, isoDepth=null, schuOsc=null, schuGain=null, sweepMult=1;
+
+function toneParams(){
+  return {
+    schu: $('ax-schu').checked,
+    carrier: parseFloat($('ax-solf').value),
+    binaural: $('ax-bin').checked,
+    iso: $('ax-iso').checked,
+    beat: parseFloat($('ax-beat').value),
+    vol: parseFloat($('ax-vol').value),
+    mute: $('ax-mute').checked
+  };
+}
+function startTones(){
+  const ac = getAC();
+  const p = toneParams();
+  toneMaster = ac.createGain(); toneMaster.gain.value = 0; toneMaster.connect(ac.destination);
+  isoGain = ac.createGain(); isoGain.gain.value = p.iso ? 0.5 : 1; isoGain.connect(toneMaster);
+  isoLFO = ac.createOscillator(); isoLFO.type = 'square'; isoLFO.frequency.value = p.beat;
+  isoDepth = ac.createGain(); isoDepth.gain.value = p.iso ? 0.5 : 0;
+  isoLFO.connect(isoDepth).connect(isoGain.gain); isoLFO.start();
+  panA = (ac.createStereoPanner ? ac.createStereoPanner() : ac.createGain());
+  panB = (ac.createStereoPanner ? ac.createStereoPanner() : ac.createGain());
+  if (panA.pan) panA.pan.value = p.binaural ? -1 : 0;
+  if (panB.pan) panB.pan.value = p.binaural ? 1 : 0;
+  panA.connect(isoGain); panB.connect(isoGain);
+  oscA = ac.createOscillator(); oscA.type = 'sine'; oscA.connect(panA);
+  oscB = ac.createOscillator(); oscB.type = 'sine';
+  const gB = ac.createGain(); gB.gain.value = p.binaural ? 1 : 0; oscB.connect(gB).connect(panB); oscB._g = gB;
+  schuOsc = ac.createOscillator(); schuOsc.type = 'sine'; schuOsc.frequency.value = 7.83;
+  schuGain = ac.createGain(); schuGain.gain.value = p.schu ? 0.05 : 0; schuOsc.connect(schuGain).connect(toneMaster);
+  oscA.start(); oscB.start(); schuOsc.start();
+  TONE.on = true;
+  applyToneParams();
+  // gentle fade-in
+  toneMaster.gain.setValueAtTime(0, ac.currentTime);
+  toneMaster.gain.linearRampToValueAtTime(p.mute ? 0 : p.vol, ac.currentTime + 0.6);
+}
+function applyToneParams(){
+  if (!TONE.on || !AC) return;
+  const p = toneParams(); const t = AC.currentTime;
+  toneSweep(true);
+  if (oscB._g) oscB._g.gain.setTargetAtTime(p.binaural ? 1 : 0, t, 0.05);
+  if (panA.pan) panA.pan.setTargetAtTime(p.binaural ? -1 : 0, t, 0.05);
+  if (panB.pan) panB.pan.setTargetAtTime(p.binaural ? 1 : 0, t, 0.05);
+  isoLFO.frequency.setTargetAtTime(p.beat, t, 0.05);
+  isoDepth.gain.setTargetAtTime(p.iso ? 0.5 : 0, t, 0.05);
+  isoGain.gain.setTargetAtTime(p.iso ? 0.5 : 1, t, 0.05);
+  schuGain.gain.setTargetAtTime(p.schu ? 0.05 : 0, t, 0.05);
+  toneMaster.gain.setTargetAtTime(p.mute ? 0 : p.vol, t, 0.08);
+}
+function toneSweep(silent){
+  if (!TONE.on || !AC || !oscA) return;
+  const y = parseInt($('year').value);
+  const norm = (y - (-1000)) / (2026 - (-1000));      // 0..1 across the timeline
+  sweepMult = 0.72 + 0.56 * norm;                      // gentle ±  carrier sweep
+  const p = toneParams(); const t = AC.currentTime;
+  oscA.frequency.setTargetAtTime(p.carrier * sweepMult, t, 0.04);
+  oscB.frequency.setTargetAtTime(p.carrier * sweepMult + p.beat, t, 0.04);
+}
+function stopTones(){
+  if (!TONE.on) return;
+  const ac = AC, t = ac.currentTime;
+  try { toneMaster.gain.cancelScheduledValues(t); toneMaster.gain.setTargetAtTime(0, t, 0.12); } catch(e){}
+  const nodes = [oscA, oscB, schuOsc, isoLFO];
+  setTimeout(() => { nodes.forEach(n => { try { n.stop(); } catch(e){} }); }, 400);
+  TONE.on = false;
+}
+function toggleTones(){
+  if (TONE.on) {
+    stopTones();
+    $('btnTones').classList.remove('on'); $('ax-tone').checked = false;
+    sysLine('Tuning tones off.'); logEvent('tones', { state:'off' });
+  } else {
+    getAC(); startTones();
+    $('btnTones').classList.add('on'); $('ax-tone').checked = true;
+    const p = toneParams();
+    sysLine(`Tuning tones on — Schumann ${p.schu?'7.83Hz':'off'} · carrier ${p.carrier}Hz${p.binaural?' · binaural':''}${p.iso?' · isochronic':''} @ ${p.beat.toFixed(2)}Hz.`);
+    logEvent('tones', { state:'on', ...p });
+  }
+  syncToneLabels();
+}
+function onToneCtl(){
+  syncToneLabels();
+  if (TONE.on) { applyToneParams(); logEvent('tones', { state:'adjust', ...toneParams() }); }
+}
+function syncToneLabels(){
+  $('ax-beatv').textContent = (+$('ax-beat').value).toFixed(2) + ' Hz';
+  $('ax-volv').textContent = Math.round(($('ax-vol').value / 0.4) * 100) + '%';
+}
+
+// ============ LIVE CAMERA — VISUAL ECHO ============
+let camStream = null, camOn = false, camRAF = 0;
+let pc = document.createElement('canvas'), pctx = pc.getContext('2d', { willReadFrequently:true });
+let ovl = document.createElement('canvas'), octx = ovl.getContext('2d');
+let prevGray = null;
+const PW = 128; // processing width
+
+async function toggleCamera(){
+  if (camOn) { stopCamera(); return; }
+  try {
+    const facing = $('ax-face').value || 'environment';
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing }, width:{ideal:1280}, height:{ideal:720} }, audio:false });
+    camEl.srcObject = camStream;
+    await camEl.play().catch(()=>{});
+    camOn = true;
+    document.body.classList.add('cam-on');
+    camCv.style.display = 'block';
+    $('btnCam').classList.add('on'); $('ax-cam').checked = true;
+    prevGray = null;
+    sysLine('Live camera coupled — visual echo processing on-device.');
+    logEvent('camera', { state:'on', facing });
+    renderCam();
+  } catch (e) {
+    $('ax-cam').checked = false;
+    sysLine('Camera access denied — cosmic field retained.', 'err');
+  }
+}
+function stopCamera(){
+  camOn = false; cancelAnimationFrame(camRAF);
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  camEl.srcObject = null;
+  camCv.style.display = 'none';
+  cctx.clearRect(0,0,camCv.width,camCv.height);
+  document.body.classList.remove('cam-on');
+  $('btnCam').classList.remove('on'); $('ax-cam').checked = false;
+  sysLine('Live camera off — cosmic field restored.'); logEvent('camera', { state:'off' });
+}
+function restartCameraIfOn(){ if (camOn) { stopCamera(); setTimeout(toggleCamera, 250); } }
+function onEchoCtl(){ $('ax-echov').textContent = Math.round($('ax-echo').value * 100) + '%'; }
+
+function renderCam(){
+  if (!camOn) return;
+  const W = camCv.width, H = camCv.height;
+  const echo = parseFloat($('ax-echo').value);
+  const doEdge = $('ax-edge').checked;
+  if (camEl.readyState >= 2) {
+    // decay / persistence trails
+    cctx.globalCompositeOperation = 'source-over';
+    cctx.fillStyle = 'rgba(4,6,13,' + (0.30 - echo * 0.22).toFixed(3) + ')';
+    cctx.fillRect(0, 0, W, H);
+    // draw processed live frame (sepia/contrast tint via ctx.filter where supported)
+    cctx.save();
+    try { cctx.filter = 'sepia(0.35) contrast(1.3) saturate(0.65) brightness(1.05)'; } catch(e){}
+    cctx.globalAlpha = 0.55 + echo * 0.25;
+    drawCover(cctx, camEl, W, H);
+    cctx.restore();
+    // recursive feedback echo (slightly scaled copy)
+    if (echo > 0.05) {
+      cctx.globalAlpha = 0.18 + echo * 0.22;
+      const s = 1 + 0.015 * echo;
+      cctx.drawImage(camCv, (W - W*s)/2, (H - H*s)/2, W*s, H*s);
+      cctx.globalAlpha = 1;
+    }
+    // edge + motion anomaly overlay
+    if (doEdge) {
+      const oc = buildOverlay();
+      if (oc) {
+        cctx.globalCompositeOperation = 'screen';
+        cctx.drawImage(oc, 0, 0, W, H);
+        cctx.globalCompositeOperation = 'source-over';
+      }
+    }
+  }
+  camRAF = requestAnimationFrame(renderCam);
+}
+function drawCover(c, src, W, H){
+  const sw = src.videoWidth || src.width, sh = src.videoHeight || src.height;
+  if (!sw || !sh) return;
+  const sr = sw/sh, dr = W/H; let dw=W, dh=H, dx=0, dy=0;
+  if (sr > dr) { dh = H; dw = H*sr; dx = (W-dw)/2; } else { dw = W; dh = W/sr; dy = (H-dh)/2; }
+  c.drawImage(src, dx, dy, dw, dh);
+}
+function buildOverlay(){
+  const ph = Math.max(2, PW * (camCv.height / camCv.width) | 0);
+  pc.width = PW; pc.height = ph; ovl.width = PW; ovl.height = ph;
+  try { pctx.drawImage(camEl, 0, 0, PW, ph); } catch(e){ return null; }
+  let d;
+  try { d = pctx.getImageData(0, 0, PW, ph); } catch(e){ return null; }
+  const px = d.data, N = PW * ph;
+  const gray = new Float32Array(N);
+  for (let i = 0; i < N; i++) gray[i] = (px[i*4]*0.3 + px[i*4+1]*0.59 + px[i*4+2]*0.11) / 255;
+  const out = octx.createImageData(PW, ph);
+  const o = out.data;
+  const hasPrev = prevGray && prevGray.length === N;
+  for (let y = 1; y < ph - 1; y++) {
+    for (let x = 1; x < PW - 1; x++) {
+      const i = y * PW + x;
+      // sobel edge
+      const gx = (gray[i-1-PW]+2*gray[i-1]+gray[i-1+PW]) - (gray[i+1-PW]+2*gray[i+1]+gray[i+1+PW]);
+      const gy = (gray[i-PW-1]+2*gray[i-PW]+gray[i-PW+1]) - (gray[i+PW-1]+2*gray[i+PW]+gray[i+PW+1]);
+      let edge = Math.min(1, Math.hypot(gx, gy) * 1.4);
+      // motion
+      let motion = hasPrev ? Math.min(1, Math.abs(gray[i] - prevGray[i]) * 4) : 0;
+      const j = i * 4;
+      const e = edge > 0.35 ? edge : 0;
+      // gold edges + pale motion "anomalies"
+      o[j]   = Math.min(255, e * 201 + motion * 255);
+      o[j+1] = Math.min(255, e * 169 + motion * 220);
+      o[j+2] = Math.min(255, e * 60  + motion * 180);
+      o[j+3] = Math.min(255, (e * 200 + motion * 220));
+    }
+  }
+  octx.putImageData(out, 0, 0);
+  prevGray = gray;
+  return ovl;
+}
+
 // ============ STATIC + FILM GRAIN RENDER ============
 function loop(t) {
   const w = canvas.width, h = canvas.height;
-  if (mode === 'footage') {
-    // Static canvas hidden behind media; render grain overlay only
+  if (mode === 'footage' || camOn) {
     ctx.clearRect(0, 0, w, h);
     gctx.clearRect(0, 0, grain.width, grain.height);
     if (!reducedMotion) {
@@ -512,7 +971,7 @@ function loop(t) {
         gctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.08)';
         gctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
       }
-      if (Math.random() < 0.04) { gctx.fillStyle = 'rgba(255,255,240,0.08)'; gctx.fillRect(Math.random() * w, 0, 1.5, h); }
+      if (Math.random() < 0.04) { gctx.fillStyle = 'rgba(255,240,210,0.08)'; gctx.fillRect(Math.random() * w, 0, 1.5, h); }
       gctx.fillStyle = `rgba(255,240,210,${0.01 + 0.015 * Math.abs(Math.sin(t * 0.013))})`;
       gctx.fillRect(0, 0, w, h);
     }
@@ -540,6 +999,92 @@ function showMedia(kind, url) {
   if (kind === 'still') $('still').src = url;
   if (!kind) { $('footage').removeAttribute('src'); $('still').removeAttribute('src'); }
   mode = kind ? 'footage' : 'static';
+}
+
+// ============ EVP RECORD + REVIEW ============
+let evpRecorder = null, evpChunks = [], evpRecording = false, evpBlob = null, evpStartTs = 0;
+async function toggleEvpRecord(){
+  if (evpRecording) { stopEvp(); return; }
+  if (!micStream) {
+    sysLine('Arming mic for EVP capture…');
+    await initSensors();
+    if (!micStream) { sysLine('EVP needs mic access.', 'err'); return; }
+  }
+  if (typeof MediaRecorder === 'undefined') { sysLine('MediaRecorder unsupported — cannot record EVP here.', 'err'); return; }
+  try {
+    let mime = '';
+    ['audio/webm','audio/mp4','audio/aac'].forEach(m => { if (!mime && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) mime = m; });
+    evpRecorder = new MediaRecorder(micStream, mime ? { mimeType: mime } : undefined);
+    evpChunks = [];
+    evpRecorder.ondataavailable = e => { if (e.data && e.data.size) evpChunks.push(e.data); };
+    evpRecorder.onstop = () => {
+      evpBlob = new Blob(evpChunks, { type: evpRecorder.mimeType || 'audio/webm' });
+      $('btnRev').disabled = false; $('ax-rev').disabled = false;
+      const dur = ((performance.now() - evpStartTs) / 1000).toFixed(1);
+      sysLine('EVP buffer captured (' + dur + 's). Tap REVIEW to slow + boost.');
+      logEvent('evp', { state:'captured', seconds:+dur });
+    };
+    evpRecorder.start();
+    evpRecording = true; evpStartTs = performance.now();
+    $('btnEvp').classList.add('rec'); $('btnEvp').textContent = '■ STOP';
+    $('ax-rec').textContent = '■ STOP';
+    sysLine('● EVP recording — state date/intent, ask, then pause and listen.');
+    logEvent('evp', { state:'recording' });
+  } catch (e) { sysLine('EVP record failed: ' + String(e.message).slice(0,50), 'err'); }
+}
+function stopEvp(){
+  try { evpRecorder.stop(); } catch(e){}
+  evpRecording = false;
+  $('btnEvp').classList.remove('rec'); $('btnEvp').textContent = '● EVP';
+  $('ax-rec').textContent = '● RECORD';
+}
+async function evpReview(){
+  if (!evpBlob) { sysLine('No EVP buffer yet — record first.', 'err'); return; }
+  const ac = getAC();
+  const speed = parseFloat($('ax-evsp').value);
+  const gateSens = parseFloat($('ax-gate').value);
+  try {
+    const arr = await evpBlob.arrayBuffer();
+    const buf = await ac.decodeAudioData(arr.slice(0));
+    const src0 = buf.getChannelData(0);
+    const n = src0.length, sr = buf.sampleRate;
+    // noise floor estimate
+    let sq = 0; for (let i = 0; i < n; i++) sq += src0[i]*src0[i];
+    const rms = Math.sqrt(sq / n), gate = rms * gateSens;
+    // process: noise gate + normalize/boost + spike hits
+    const out = ac.createBuffer(1, n, sr);
+    const o = out.getChannelData(0);
+    let peak = 1e-6; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(src0[i]));
+    const norm = 0.9 / peak;
+    const win = Math.max(1, (sr * 0.05) | 0);
+    const hits = []; let acc = 0, wc = 0, lastFlag = -1;
+    for (let i = 0; i < n; i++) {
+      let s = src0[i];
+      s = Math.abs(s) < gate ? s * 0.15 : s;   // gate quiet noise
+      o[i] = Math.max(-1, Math.min(1, s * norm * 1.4));
+      acc += src0[i]*src0[i]; wc++;
+      if (wc >= win) {
+        const wr = Math.sqrt(acc / wc);
+        if (wr > gate * 1.6 && i - lastFlag > sr * 0.35) { hits.push((i / sr)); lastFlag = i; }
+        acc = 0; wc = 0;
+      }
+    }
+    // playback graph: slow rate + voice-band peaking + highpass + gain
+    const src = ac.createBufferSource(); src.buffer = out; src.playbackRate.value = speed;
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 160;
+    const pk = ac.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 1800; pk.Q.value = 1.1; pk.gain.value = 9;
+    const g = ac.createGain(); g.gain.value = 1.5;
+    src.connect(hp).connect(pk).connect(g).connect(ac.destination);
+    src.start();
+    $('status').textContent = '▷ EVP REVIEW ×' + speed.toFixed(2);
+    sysLine(`EVP review — ${(speed*100)|0}% speed, +9dB voice-band, gate ${gateSens.toFixed(2)}×. ${hits.length} spike(s) flagged.`);
+    logEvent('evp', { state:'review', speed, gateSens, hits: hits.map(h => +h.toFixed(2)) });
+    hits.slice(0, 12).forEach(h => sysLine('  ▲ hit @ ' + h.toFixed(2) + 's', 'hit'));
+    if (hits.length) flashHit();
+    src.onended = () => { $('status').textContent = 'STANDBY'; };
+  } catch (e) {
+    sysLine('EVP decode failed (' + String(e.message).slice(0,40) + '). Some iOS builds limit recorded formats.', 'err');
+  }
 }
 
 // ============ OUTPUT ============
@@ -574,7 +1119,81 @@ async function tuningSequence(fast) {
   })(); });
 }
 
-// ============ KEYS ============
+// ============ SESSION LOG ============
+let SESSION = loadSession();
+function loadSession(){
+  try { const s = JSON.parse(localStorage.getItem('cv_session') || 'null'); if (s && s.events) return s; } catch(e){}
+  return { started: new Date().toISOString(), events: [] };
+}
+function logEvent(type, data){
+  SESSION.events.push(Object.assign({ t: new Date().toISOString(), type }, data || {}));
+  try { localStorage.setItem('cv_session', JSON.stringify(SESSION)); } catch(e){}
+  const s = $('ax-logstat'); if (s) s.textContent = SESSION.events.length + ' events logged';
+}
+function sessionSnapshot(){
+  return {
+    infrasound: +(infraLevel * 10).toFixed(1), bearing: +fieldReading.toFixed(0),
+    vibration: +motionReading.toFixed(2), gps: gpsCoords, tones: TONE.on ? toneParams() : null,
+    camera: camOn, sig: $('c-sig').textContent
+  };
+}
+function exportLog(fmt){
+  const target = $('prompt').value.trim() || '(unspecified)';
+  const year = $('yearval').textContent, date = $('date').value || '(none)';
+  const hits = SESSION.events.filter(e => e.type === 'hit' || (e.type === 'evp' && e.hits && e.hits.length));
+  let blob, name;
+  if (fmt === 'json') {
+    const data = { protocol:'PAC-V', device:'Chronovisor Aether Receiver (PWA)', exported: new Date().toISOString(),
+      sessionStart: SESSION.started, target, timelineYear: year, date, snapshot: sessionSnapshot(), events: SESSION.events };
+    blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+    name = 'pacv-session-' + Date.now() + '.json';
+  } else {
+    const l = [];
+    l.push('SESSION LOG — PAC-V PROTOCOL');
+    l.push('Chronovisor Aether Receiver · experimental · not a real observation of the past');
+    l.push('');
+    l.push('Date / Time      : ' + new Date().toLocaleString());
+    l.push('Session Start    : ' + SESSION.started);
+    l.push('Location / GPS   : ' + (gpsCoords ? gpsCoords.lat + ', ' + gpsCoords.lon : '(not captured)'));
+    l.push('Intent / Target  : ' + target);
+    l.push('Timeline / Era   : ' + year + (date !== '(none)' ? ' · date ' + date : ''));
+    const t = TONE.on ? toneParams() : null;
+    l.push('Tones / Freqs    : ' + (t ? `Schumann ${t.schu?'7.83Hz':'off'}, carrier ${t.carrier}Hz${t.binaural?', binaural':''}${t.iso?', isochronic':''} @ ${t.beat}Hz` : '(tones off)'));
+    l.push('Sensors          : INFRA ' + (infraLevel*10).toFixed(1) + ', FIELD ' + fieldReading.toFixed(0) + '°, MOTION ' + motionReading.toFixed(2) + ', ' + $('c-sig').textContent);
+    l.push('Camera echo      : ' + (camOn ? 'live' : 'off'));
+    l.push('');
+    l.push('KEY OBSERVATIONS (' + hits.length + ' flagged):');
+    if (!hits.length) l.push('  (none flagged)');
+    hits.forEach(h => {
+      if (h.type === 'hit') l.push('  ' + h.t + '  ▲ live spike (level ' + h.level + ' / floor ' + h.floor + ')');
+      else l.push('  ' + h.t + '  ▲ EVP review hits @ ' + h.hits.join('s, ') + 's');
+    });
+    l.push('');
+    l.push('FULL EVENT LOG:');
+    SESSION.events.forEach(e => l.push('  ' + e.t + '  [' + e.type + ']  ' + JSON.stringify(e).replace(/[{}"]/g,'').replace(/,/g,', ')));
+    l.push('');
+    l.push('POST-SESSION INTERPRETATION (multiple lenses):');
+    l.push('  1. Literal / Paranormal: ____');
+    l.push('  2. Psychological / Pareidolia: ____');
+    l.push('  3. Technical / Artifact / RF: ____');
+    l.push('  4. Synchronicity / Insight: ____');
+    l.push('  5. Next experiment: ____');
+    blob = new Blob([l.join('\n')], { type:'text/plain' });
+    name = 'pacv-session-' + Date.now() + '.txt';
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  sysLine('Session log exported (' + fmt.toUpperCase() + ').');
+}
+function clearLog(){
+  SESSION = { started: new Date().toISOString(), events: [] };
+  localStorage.removeItem('cv_session');
+  $('ax-logstat').textContent = '0 events logged';
+  sysLine('Session log cleared.');
+}
+
+// ============ KEYS + AETHER MODALS ============
 function showKeyModal() {
   $('keymodal').style.display = 'flex';
   $('antkey').value = localStorage.getItem('cv_key') || '';
@@ -594,6 +1213,9 @@ function clearKeys() {
   ['cv_key','cv_fal','cv_fal_vm','cv_fal_im'].forEach(k => localStorage.removeItem(k));
   hideKeyModal(); sysLine('All keys cleared.');
 }
+function showAether(){ $('aethermodal').style.display = 'flex'; syncToneLabels(); onEchoCtl();
+  $('ax-logstat').textContent = SESSION.events.length + ' events logged'; }
+function hideAether(){ $('aethermodal').style.display = 'none'; }
 
 // ============ ARCHIVE ============
 function saveToArchive(target, rec) {
@@ -673,11 +1295,19 @@ async function viewPast(isScrub = false) {
   if (!isScrub) output.innerHTML = '';
   $('stamp').textContent = ''; setConf(null);
 
+  // RECEIVE couples the tuning tones (spec: ARM/RECEIVE starts tones)
+  if ($('ax-tone') && $('ax-tone').checked && !TONE.on) { getAC(); startTones(); $('btnTones').classList.add('on'); }
+
   lastTargetBase = promptVal;
   let target = promptVal + ' — era/year: ' + yearLbl;
   if (dateVal) target += ' — exact date: ' + dateVal;
   if (gpsCoords) target += ` — coordinates: ${gpsCoords.lat}, ${gpsCoords.lon}`;
-  const sensorCtx = `Instrument telemetry — infrasound residue ${(infraLevel * 10).toFixed(1)}/10, bearing ${fieldReading.toFixed(0)}°, vibration ${motionReading.toFixed(2)} m/s².`;
+  const hitCount = SESSION.events.filter(e => e.type === 'hit' || (e.type === 'evp' && e.hits && e.hits.length)).length;
+  const t = TONE.on ? toneParams() : null;
+  const toneCtx = t ? ` Aether tones active: Schumann ${t.schu?'7.83Hz':'off'}, carrier ${(t.carrier*sweepMult).toFixed(0)}Hz${t.binaural?', binaural':''}${t.iso?', isochronic':''} @ ${t.beat}Hz.` : '';
+  const sensorCtx = `Instrument telemetry — infrasound residue ${(infraLevel * 10).toFixed(1)}/10, bearing ${fieldReading.toFixed(0)}°, vibration ${motionReading.toFixed(2)} m/s², ${hitCount} flagged anomaly hit(s).${toneCtx}`;
+
+  logEvent('receive', { target: promptVal, year: yearLbl, date: dateVal || null, engine, snapshot: sessionSnapshot() });
 
   const antKey = localStorage.getItem('cv_key');
   const falKey = localStorage.getItem('cv_fal');
@@ -749,6 +1379,7 @@ Respond ONLY with valid JSON, no fences. Use real historical/geographic knowledg
     $('stamp').textContent = rec.stamp || '';
     setConf(rec.confidence);
     saveToArchive(promptVal + ' · ' + yearLbl, rec);
+    logEvent('decode', { engine, confidence: rec.confidence, media: rec.mediaKind || 'prompt' });
     await typewriter(rec.narration || '');
     if (rec.mediaKind) sysLine('Scrub TIMELINE to shift eras. Footage archived.');
   } catch (e) {

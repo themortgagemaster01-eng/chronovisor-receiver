@@ -1,4 +1,4 @@
-const CACHE = 'chronovisor-v4';
+const CACHE = 'chronovisor-v5';
 const SHELL = ['.', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -8,5 +8,6 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.url.includes('api.anthropic.com')) return; // never cache API calls
+  if (e.request.url.includes('queue.fal.run') || e.request.url.includes('fal.media')) return; // never cache decoder
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
