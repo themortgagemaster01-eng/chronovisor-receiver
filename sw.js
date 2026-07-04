@@ -1,4 +1,4 @@
-const CACHE = 'chronovisor-v6';
+const CACHE = 'chronovisor-v7';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 // INSTALL — pre-cache the shell and activate immediately (no waiting for old tabs to close)
@@ -64,4 +64,4 @@ self.addEventListener('fetch', e => {
     })
   );
 });
-// build 2026-07-03 — reception v6 · network-first HTML + SWR assets + auto-update
+// build 2026-07-04 — reception v7 · bulletproof media wiring (CAMERA->viewport, EVP mic-only, RECEIVE motion-perm in-gesture) + inline permission feedback + per-button debug logging · network-first HTML + SWR assets + auto-update
