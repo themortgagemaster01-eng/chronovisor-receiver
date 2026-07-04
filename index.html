@@ -132,6 +132,13 @@
   .ae-tog:disabled{ opacity:.4; cursor:default; }
   .ae-more{ flex:0 0 auto; }
 
+  /* subtle inline permission / status note (never a blocking alert) */
+  #permnote{ max-height:0; overflow:hidden; opacity:0; transition:.3s ease;
+    font-size:10px; letter-spacing:.1em; color:var(--amber); text-align:center;
+    padding:0 6px; text-shadow:0 0 8px rgba(232,196,122,.4); }
+  #permnote.show{ max-height:44px; opacity:1; padding:3px 6px; }
+  #permnote.err{ color:var(--alert); text-shadow:0 0 8px rgba(224,106,90,.4); }
+
   .viewport-wrap{ flex:1 1 auto; min-height:0; display:flex; }
   #display{ position:relative; flex:1; min-height:170px; overflow:hidden; isolation:isolate;
     border-radius:26px; background:#04050c;
@@ -403,6 +410,8 @@
     <button class="pill-sm ae-more" onclick="showAether()">◊ AETHER</button>
   </div>
 
+  <div id="permnote" role="status" aria-live="polite"></div>
+
   <div class="viewport-wrap">
     <div id="display">
       <div id="nebula"></div>
@@ -618,10 +627,66 @@ $('year').addEventListener('change', () => {
 });
 
 // ============ SENSORS ============
+// subtle, non-blocking inline note under the control bar (never an alert())
+let permNoteTimer = null;
+function inlineNote(msg, kind) {
+  const el = $('permnote'); if (!el) return;
+  el.textContent = msg;
+  el.className = 'permnote show' + (kind === 'err' ? ' err' : '');
+  clearTimeout(permNoteTimer);
+  permNoteTimer = setTimeout(() => { el.className = 'permnote'; }, 5200);
+}
+
+// iOS motion/orientation gate — MUST be invoked inside the user gesture (ARM or RECEIVE).
+// Idempotent: safe to call from multiple buttons; only prompts / attaches once.
+let motionArmed = false;
+async function requestMotionPerm() {
+  if (motionArmed) return true;
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
+      const perm = await DeviceMotionEvent.requestPermission();
+      dbg('DeviceMotionEvent.requestPermission → ' + perm, perm === 'granted' ? 'ok' : 'err');
+      if (perm !== 'granted') throw new Error('motion permission ' + perm);
+    } else {
+      dbg('DeviceMotion permission API absent — attaching listeners directly.');
+    }
+    if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) {
+      try {
+        const o = await DeviceOrientationEvent.requestPermission();
+        dbg('DeviceOrientationEvent.requestPermission → ' + o, o === 'granted' ? 'ok' : 'err');
+      } catch (_) {}
+    }
+    addEventListener('devicemotion', e => {
+      const a = e.accelerationIncludingGravity;
+      if (a) motionReading = Math.abs(Math.hypot(a.x||0, a.y||0, a.z||0) - 9.81);
+    });
+    addEventListener('deviceorientation', e => {
+      const h = e.webkitCompassHeading ?? e.alpha;
+      if (h != null) fieldReading = h;
+    });
+    motionArmed = true;
+    $('c-motion').textContent = 'MOTION LIVE'; $('c-motion').classList.add('on');
+    $('c-mag').classList.add('on');
+    dbg('Motion + orientation (magnetometer/compass) listeners active.', 'ok');
+    sysLine('Motion + field sensors armed.');
+    return true;
+  } catch (e) {
+    dbg('Motion/field sensors FAILED: ' + (e && e.message || e), 'err');
+    inlineNote('Motion sensors unavailable or denied.', 'err');
+    sysLine('Motion sensors unavailable or denied.', 'err');
+    return false;
+  }
+}
+
 async function initSensors() {
-  dbg('ARM SENSORS tapped — requesting microphone + motion/field access…');
+  dbg('ARM SENSORS tapped — requesting microphone (audio-only) + motion/field access…');
+  // getUserMedia is called directly here so it stays inside the ARM tap gesture (iOS requirement)
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    dbg('getUserMedia unavailable — insecure context or unsupported browser.', 'err');
+    inlineNote('Mic unavailable — needs HTTPS + a supporting browser.', 'err');
     sysLine('getUserMedia unavailable (needs HTTPS + a supporting browser).', 'err');
+  } else if (micStream) {
+    dbg('Mic already armed — reusing existing audio stream.', 'ok');
   } else try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
@@ -637,32 +702,10 @@ async function initSensors() {
     sysLine('Microphone armed — spectrogram + waveform + EVP monitor live.');
   } catch (e) {
     dbg('getUserMedia(audio) FAILED: ' + (e && e.name || '') + ' — ' + (e && e.message || e), 'err');
+    inlineNote('Mic blocked — enable it in Settings ▸ Safari, then tap ARM again.', 'err');
     sysLine('Mic access denied — page still works, visuals only.', 'err');
   }
-  try {
-    if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
-      const perm = await DeviceMotionEvent.requestPermission();
-      dbg('DeviceMotionEvent.requestPermission → ' + perm, perm === 'granted' ? 'ok' : 'err');
-      if (perm !== 'granted') throw new Error('motion permission ' + perm);
-    } else {
-      dbg('DeviceMotion permission API absent — attaching listeners directly.');
-    }
-    addEventListener('devicemotion', e => {
-      const a = e.accelerationIncludingGravity;
-      if (a) motionReading = Math.abs(Math.hypot(a.x||0, a.y||0, a.z||0) - 9.81);
-    });
-    addEventListener('deviceorientation', e => {
-      const h = e.webkitCompassHeading ?? e.alpha;
-      if (h != null) fieldReading = h;
-    });
-    $('c-motion').textContent = 'MOTION LIVE'; $('c-motion').classList.add('on');
-    $('c-mag').classList.add('on');
-    dbg('Motion + orientation (magnetometer/compass) listeners active.', 'ok');
-    sysLine('Motion + field sensors armed.');
-  } catch (e) {
-    dbg('Motion/field sensors FAILED: ' + (e && e.message || e), 'err');
-    sysLine('Motion sensors unavailable or denied.', 'err');
-  }
+  await requestMotionPerm();
 }
 
 function useGPS() {
@@ -838,6 +881,7 @@ function stopTones(){
   TONE.on = false;
 }
 function toggleTones(){
+  dbg('TONES tapped — ' + (TONE.on ? 'stopping' : 'starting') + ' tone engine.');
   if (TONE.on) {
     stopTones();
     $('btnTones').classList.remove('on'); $('ax-tone').checked = false;
@@ -869,26 +913,45 @@ const PW = 128; // processing width
 
 async function toggleCamera(){
   if (camOn) { stopCamera(); return; }
-  try {
-    const facing = $('ax-face').value || 'environment';
-    camStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: facing }, width:{ideal:1280}, height:{ideal:720} }, audio:false });
-    camEl.srcObject = camStream;
-    await camEl.play().catch(()=>{});
-    camOn = true;
-    document.body.classList.add('cam-on');
-    camCv.style.display = 'block';
-    $('btnCam').classList.add('on'); $('ax-cam').checked = true;
-    prevGray = null;
-    dbg('getUserMedia(video, facing=' + facing + '): GRANTED', 'ok');
-    sysLine('Live camera coupled — visual echo processing on-device.');
-    logEvent('camera', { state:'on', facing });
-    renderCam();
-  } catch (e) {
+  const facing = $('ax-face').value || 'environment';
+  dbg('CAMERA tapped — requesting camera (facing=' + facing + ') into viewport…');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     $('ax-cam').checked = false;
-    dbg('getUserMedia(video) FAILED: ' + (e && e.name || '') + ' — ' + (e && e.message || e), 'err');
-    sysLine('Camera access denied — cosmic field retained.', 'err');
+    dbg('getUserMedia unavailable — insecure context or unsupported browser.', 'err');
+    inlineNote('Camera unavailable — needs HTTPS + a supporting browser.', 'err');
+    sysLine('Camera unavailable (needs HTTPS + a supporting browser).', 'err');
+    return;
   }
+  // getUserMedia is called directly in the tap handler so it stays inside the user gesture (iOS)
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facing }, width:{ideal:1280}, height:{ideal:720} }, audio:false });
+  } catch (e1) {
+    // permission granted but constraints unmet on some devices — retry with a plain video request
+    dbg('getUserMedia(video, constrained) ' + (e1 && e1.name || '') + ' — retrying with simple constraints', 'warn');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+    } catch (e2) {
+      $('ax-cam').checked = false;
+      dbg('getUserMedia(video) FAILED: ' + (e2 && e2.name || '') + ' — ' + (e2 && e2.message || e2), 'err');
+      inlineNote('Camera blocked — enable it in Settings ▸ Safari, then tap CAMERA again.', 'err');
+      sysLine('Camera access denied — cosmic field retained.', 'err');
+      return;
+    }
+  }
+  camStream = stream;
+  camEl.srcObject = camStream;            // route the live feed into the existing gold viewport (#cam → #display)
+  await camEl.play().catch(()=>{});
+  camOn = true;
+  document.body.classList.add('cam-on');
+  camCv.style.display = 'block';
+  $('btnCam').classList.add('on'); $('ax-cam').checked = true;
+  prevGray = null;
+  dbg('getUserMedia(video, facing=' + facing + '): GRANTED — routed into viewport', 'ok');
+  sysLine('Live camera coupled — visual echo processing on-device.');
+  logEvent('camera', { state:'on', facing });
+  renderCam();
 }
 function stopCamera(){
   camOn = false; cancelAnimationFrame(camRAF);
@@ -1024,11 +1087,12 @@ function showMedia(kind, url) {
 // ============ EVP RECORD + REVIEW ============
 let evpRecorder = null, evpChunks = [], evpRecording = false, evpBlob = null, evpStartTs = 0;
 async function toggleEvpRecord(){
+  dbg('EVP tapped — ' + (evpRecording ? 'stopping' : 'starting') + ' recorder (mic audio-only).');
   if (evpRecording) { stopEvp(); return; }
   if (!micStream) {
     sysLine('Arming mic for EVP capture…');
-    await initSensors();
-    if (!micStream) { sysLine('EVP needs mic access.', 'err'); return; }
+    await initSensors();   // requests audio-only getUserMedia inside this same tap gesture
+    if (!micStream) { inlineNote('EVP needs mic — allow the microphone prompt.', 'err'); sysLine('EVP needs mic access.', 'err'); return; }
   }
   if (typeof MediaRecorder === 'undefined') { sysLine('MediaRecorder unsupported — cannot record EVP here.', 'err'); return; }
   try {
@@ -1059,7 +1123,8 @@ function stopEvp(){
   $('ax-rec').textContent = '● RECORD';
 }
 async function evpReview(){
-  if (!evpBlob) { sysLine('No EVP buffer yet — record first.', 'err'); return; }
+  dbg('REVIEW tapped — ' + (evpBlob ? 'replaying EVP buffer.' : 'no EVP buffer captured yet.'));
+  if (!evpBlob) { inlineNote('Record an EVP pass first, then REVIEW.', 'err'); sysLine('No EVP buffer yet — record first.', 'err'); return; }
   const ac = getAC();
   const speed = parseFloat($('ax-evsp').value);
   const gateSens = parseFloat($('ax-gate').value);
@@ -1371,7 +1436,10 @@ async function viewPast(isScrub = false) {
   const yearLbl = $('yearval').textContent;
   const persp = $('perspective').value;
   const engine = $('engine').value;
-  if (!promptVal) { sysLine('No target specified.', 'err'); return; }
+  dbg('RECEIVE tapped — target="' + promptVal.slice(0, 40) + '" year=' + yearLbl + ' engine=' + engine + (isScrub ? ' (timeline scrub)' : ''));
+  if (!promptVal) { inlineNote('Enter a target before RECEIVE.', 'err'); sysLine('No target specified.', 'err'); return; }
+  // iOS motion/orientation permission must be requested inside this RECEIVE tap gesture (fire, don't block)
+  requestMotionPerm();
   $('tuneBtn').disabled = true;
   if (!isScrub) output.innerHTML = '';
   $('stamp').textContent = ''; setConf(null);
